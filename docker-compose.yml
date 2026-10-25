@@ -1,0 +1,21 @@
+# Local Postgres for development. Start with: docker compose up -d
+# Credentials are local-only; production uses Neon via Render env vars.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: housework
+      POSTGRES_USER: housework
+      POSTGRES_PASSWORD: housework
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U housework -d housework"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
