@@ -52,7 +52,11 @@ A bare Spring Boot 4.1 skeleton (`backend/`: Web + Actuator, Java 25, multi-stag
   - Postgres version: **18.6**, checked with `select version();` in the Neon SQL Editor
   - The connection uses the direct (non-pooled) endpoint in JDBC form with `sslmode=require&channelBinding=require`. Credentials are kept out of the repo.
   - Setup time, from signup to a working SQL Editor query: **~15 min**
-  - Connection from Render works: deferred to Sprint 1 story 5, when the datasource is added
+  - Connection from Render works: **confirmed** in BILLIAMVT-34. Render connects over the direct endpoint via the `SPRING_DATASOURCE_*` env vars, and Flyway applied V1 on Neon.
+- After adding JPA, Flyway and the Neon connection (BILLIAMVT-34, commit `662b629`):
+  - Spring Boot startup: **50.8 s**, up from 24.8 s. Hibernate/JPA setup adds about 8–10 s, opening the first Neon connection about 4 s (Neon may also be resuming from its 5-minute suspend), and Flyway under 2 s.
+  - Cold start, first request after more than 15 min idle: **63.4 s**, up from 43.3 s.
+  - The first deploy of this change failed because the env vars weren't present on Render, so the app fell back to the `localhost` default. The health check caught it and Render kept the previous version live, with no downtime.
 
 ## Decision
 
@@ -75,7 +79,7 @@ Use **Render** (free web service, Docker runtime, Ohio) for the Spring Boot back
 
 ## Revisit if
 
-- Cold starts make real household use frustrating. Expect them to grow past 43 s as JPA, Flyway and more beans are added, so re-measure after Sprint 1 story 5. Next steps would be tuning startup (lazy init, CDS/AOT) or moving to Render's $7/mo instance (0.5 CPU and 512 MB, always on).
+- Cold starts make real household use frustrating. They grew from 43 s to **63 s** with JPA and Flyway (BILLIAMVT-34), and will grow further as features are added. Re-check during household use (BILLIAMVT-31). Next steps would be tuning startup (lazy init, CDS/AOT) or moving to Render's $7/mo instance (0.5 CPU and 512 MB, always on).
 - Memory use approaches 512 MB as features are added. Since Render's free tier doesn't show memory, watch for out-of-memory restarts in the logs, or expose Actuator's `metrics` endpoint behind authentication once security is in place.
 - Neon's free compute hours (100 CU-hours per month) start running out. Scale-to-zero after 5 idle minutes should keep usage low for one household.
 
