@@ -14,8 +14,7 @@ docs/decisions/      Decision records from spikes
 
 - JDK 25 (check with `java -version`)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/), running. The local database and the tests both use it.
-
-You don't need to install Maven. The project includes the Maven wrapper (`./mvnw`), which is what CI and the Docker build use. A globally installed `mvn` works too.
+- Maven 3.9+ (`mvn -version`). If you don't have Maven installed, use the included wrapper instead: replace `mvn` with `./mvnw` in the commands below. CI and the Docker build use the wrapper, so they need no Maven install.
 
 ## Run locally
 
@@ -28,8 +27,10 @@ docker compose up -d
 Then start the app from the `backend/` directory:
 
 ```bash
-./mvnw spring-boot:run
+mvn spring-boot:run
 ```
+
+This runs with the `local` profile, which points the app at the Compose database (`application-local.properties`). If you start the app another way, such as an IntelliJ run configuration, set the active profile to `local` (or the environment variable `SPRING_PROFILES_ACTIVE=local`).
 
 The app starts on port 8080. To check that it's up:
 
@@ -39,7 +40,7 @@ curl http://localhost:8080/actuator/health
 
 You should get `{"status":"UP",...}` with HTTP 200. If Postgres isn't running, the status is `DOWN`.
 
-To use a different port, set the `PORT` environment variable (for example `PORT=9090 ./mvnw spring-boot:run`).
+To use a different port, set the `PORT` environment variable (for example `PORT=9090 mvn spring-boot:run`).
 
 ## Database
 
@@ -59,7 +60,7 @@ Postgres 18 (matching production on Neon). Schema changes are [Flyway](https://d
 From `backend/`:
 
 ```bash
-./mvnw verify
+mvn verify
 ```
 
 Tests run against a throwaway Postgres 18 container started by [Testcontainers](https://testcontainers.com), so Docker must be running. The Compose database isn't needed.
@@ -67,9 +68,17 @@ Tests run against a throwaway Postgres 18 container started by [Testcontainers](
 ## Build and run the jar
 
 ```bash
-./mvnw package
-java -jar target/housework-api-0.0.1-SNAPSHOT.jar
+mvn package
+SPRING_PROFILES_ACTIVE=local java -jar target/housework-api-0.0.1-SNAPSHOT.jar
 ```
+
+Without the `local` profile (as in production), the jar needs the `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` environment variables. If they're missing, startup fails with Spring Boot's "Failed to configure a DataSource: 'url' attribute is not specified" report instead of trying to connect to localhost.
+
+## Troubleshooting
+
+- **"Failed to configure a DataSource: 'url' attribute is not specified"** at startup: the app has no database settings.
+  - Locally: start Postgres with `docker compose up -d` and run with the `local` profile (`mvn spring-boot:run` does this).
+  - On Render: set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` under the service's **Environment**, then rerun **Actions → Deploy → Run workflow**.
 
 ## Deployment
 
