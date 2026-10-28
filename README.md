@@ -6,6 +6,7 @@ An app for scheduling recurring housework that a household shares: you enter rec
 
 ```
 backend/             Spring Boot API (Java 25, Maven)
+frontend/            Angular web app (Angular 22, Node 24)
 docker-compose.yml   Local Postgres for development
 docs/decisions/      Decision records from spikes
 ```
@@ -14,6 +15,7 @@ docs/decisions/      Decision records from spikes
 
 - JDK 25 (check with `java -version`)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/), running. The local database and the tests both use it.
+- Node.js 24 LTS (`node --version`), for the front end. Install the Angular CLI with `npm install -g @angular/cli`.
 - Maven 3.9+ (`mvn -version`). If you don't have Maven installed, use the included wrapper instead: replace `mvn` with `./mvnw` in the commands below. CI and the Docker build use the wrapper, so they need no Maven install.
 
 ## Run locally
@@ -42,6 +44,16 @@ You should get `{"status":"UP",...}` with HTTP 200. If Postgres isn't running, t
 
 To use a different port, set the `PORT` environment variable (for example `PORT=9090 mvn spring-boot:run`).
 
+### Front end
+
+From the `frontend/` directory, install dependencies once with `npm install`, then:
+
+```bash
+ng serve
+```
+
+Open http://localhost:4200. In development the app calls the backend at `http://localhost:8080`, so run the backend too (above); the `local` profile allows the dev server's origin (CORS). The API URL for each build is set in `frontend/src/environments/`.
+
 ## Database
 
 Postgres 18 (matching production on Neon). Schema changes are [Flyway](https://documentation.red-gate.com/flyway) migrations in `backend/src/main/resources/db/migration/`, applied automatically when the app starts.
@@ -65,6 +77,12 @@ mvn verify
 
 Tests run against a throwaway Postgres 18 container started by [Testcontainers](https://testcontainers.com), so Docker must be running. The Compose database isn't needed.
 
+Front-end tests (Vitest), from `frontend/`:
+
+```bash
+ng test
+```
+
 ## Build and run the jar
 
 ```bash
@@ -82,17 +100,21 @@ Without the `local` profile (as in production), the jar needs the `SPRING_DATASO
 
 ## Deployment
 
-Every merge to `main` deploys the backend to [Render](https://render.com), using `backend/Dockerfile`. The database is Postgres on [Neon](https://neon.com); Render supplies the connection through the `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` environment variables.
+The backend runs on [Render](https://render.com), built from `backend/Dockerfile`, with Postgres on [Neon](https://neon.com); Render supplies the connection through the `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` environment variables. The front end is served by GitHub Pages at https://billiamvt.github.io/SDEV-590-Project/.
+
+CI and deploys run only for the parts of the repo a change touches (`.github/scripts/changed-parts.sh`): `backend/`, `frontend/`, or both. Changes to the workflows count as both. A change that touches neither, such as this README, skips the builds and deploys nothing.
 
 How a merge reaches production:
 
-1. **CI** (`.github/workflows/ci.yml`) builds and tests the merge commit on `main`.
-2. **Deploy** (`.github/workflows/deploy.yml`) runs when CI passes. It asks Render's API to deploy that exact commit, waits until the deploy is live, then checks `/actuator/health`. Flyway migrations run when the new version starts.
-3. The Deploy run passes only if the new version is live and healthy. A failed build, a failed start, or a failed health check shows as a failed run in the **Actions** tab, and Render keeps the previous version running.
+1. **CI** (`.github/workflows/ci.yml`) builds and tests the changed parts of the merge commit on `main`. On pull requests, "Backend build and test" and "Frontend build and test" are required checks; a skipped job counts as passing.
+2. **Deploy** (`.github/workflows/deploy.yml`) runs when CI passes:
+   - **Backend:** asks Render's API to deploy that exact commit, waits until it's live, then checks `/actuator/health`. Flyway migrations run when the new version starts.
+   - **Front end:** builds the Angular app for `/SDEV-590-Project/` and publishes it to GitHub Pages.
+3. The Deploy run passes only if every deploy it started succeeded. A failure shows as a failed run in the **Actions** tab, and the previous version keeps running.
 
-To redeploy without a merge, for example after changing an environment variable on Render, open **Actions → Deploy → Run workflow** on `main`.
+To redeploy without a merge, for example after changing an environment variable on Render, open **Actions → Deploy → Run workflow** on `main`. A manual run deploys both parts.
 
-The workflow needs two repository secrets: `RENDER_API_KEY` (from Render's Account Settings) and `RENDER_SERVICE_ID` (the `srv-...` ID of the web service). Render's own auto-deploy is turned off so each merge deploys once.
+The backend deploy needs two repository secrets: `RENDER_API_KEY` (from Render's Account Settings) and `RENDER_SERVICE_ID` (the `srv-...` ID of the web service). Render's own auto-deploy is turned off so each merge deploys once. GitHub Pages must have its source set to **GitHub Actions** (Settings → Pages).
 
 - Live health check: https://sdev-590-project.onrender.com/actuator/health
 - The free instance sleeps after 15 minutes without traffic, so the first request after that takes about a minute.

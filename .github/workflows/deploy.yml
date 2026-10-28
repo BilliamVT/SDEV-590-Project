@@ -1,7 +1,8 @@
 name: Deploy
 
-# Deploys the backend to Render after CI passes on main, then waits until the
-# new version is live and healthy. A run's result is the deploy's result, so
+# Deploys the parts of the app that changed after CI passes on main: the backend
+# to Render (waiting until it's live and healthy) and the frontend to GitHub
+# Pages. A manual run deploys both. A run's result is the deploy's result, so
 # this workflow's history is the source for the delivery metrics (BILLIAMVT-30).
 on:
   workflow_run:
@@ -19,13 +20,35 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Deploy backend to Render
+  changes:
+    name: Detect changes
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.parts.outputs.backend }}
+      frontend: ${{ steps.parts.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+
+      # A merge is compared with the commit before it on main; a manual run
+      # has no base, so it deploys everything.
+      - name: Find changed parts
+        id: parts
+        run: .github/scripts/changed-parts.sh "$BASE_SHA" HEAD
+        env:
+          BASE_SHA: ${{ github.event_name == 'workflow_run' && format('{0}^1', github.event.workflow_run.head_sha) || '' }}
+
+  backend:
+    name: Deploy backend to Render
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -86,3 +109,48 @@ jobs:
           done
           echo "::error::Health check at $HEALTH_URL did not report UP"
           exit 1
+
+  frontend:
+    name: Deploy frontend to GitHub Pages
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Pages serves the app under /<repo name>/. Serving index.html as the 404
+      # page lets Angular handle routes when a page is opened directly.
+      - name: Build
+        run: |
+          npx ng build --base-href /SDEV-590-Project/
+          cp dist/frontend/browser/index.html dist/frontend/browser/404.html
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: frontend/dist/frontend/browser
+
+      - name: Publish to GitHub Pages
+        id: pages
+        uses: actions/deploy-pages@v4
