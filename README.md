@@ -73,9 +73,23 @@ java -jar target/housework-api-0.0.1-SNAPSHOT.jar
 
 ## Deployment
 
-Every push to `main` that changes `backend/` deploys automatically to [Render](https://render.com) once CI passes, using `backend/Dockerfile`. The database is Postgres on [Neon](https://neon.com); Render supplies the connection through the `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` environment variables.
+Every merge to `main` deploys the backend to [Render](https://render.com), using `backend/Dockerfile`. The database is Postgres on [Neon](https://neon.com); Render supplies the connection through the `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` environment variables.
+
+How a merge reaches production:
+
+1. **CI** (`.github/workflows/ci.yml`) builds and tests the merge commit on `main`.
+2. **Deploy** (`.github/workflows/deploy.yml`) runs when CI passes. It asks Render's API to deploy that exact commit, waits until the deploy is live, then checks `/actuator/health`. Flyway migrations run when the new version starts.
+3. The Deploy run passes only if the new version is live and healthy. A failed build, a failed start, or a failed health check shows as a failed run in the **Actions** tab, and Render keeps the previous version running.
+
+To redeploy without a merge, for example after changing an environment variable on Render, open **Actions → Deploy → Run workflow** on `main`.
+
+The workflow needs two repository secrets: `RENDER_API_KEY` (from Render's Account Settings) and `RENDER_SERVICE_ID` (the `srv-...` ID of the web service). Render's own auto-deploy is turned off so each merge deploys once.
 
 - Live health check: https://sdev-590-project.onrender.com/actuator/health
-- The free instance sleeps after 15 minutes without traffic, so the first request after that takes about 45 seconds.
+- The free instance sleeps after 15 minutes without traffic, so the first request after that takes about a minute.
+
+### Hotfixes
+
+Add the `hotfix` label to any PR that fixes a problem in production. The delivery metrics use it to count deploys that shipped a defect (change failure rate), so a missing label undercounts failures.
 
 [Decision 0001](docs/decisions/0001-hosting-and-database.md) explains why these services were chosen.
