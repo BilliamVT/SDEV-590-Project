@@ -1,0 +1,88 @@
+name: Deploy
+
+# Deploys the backend to Render after CI passes on main, then waits until the
+# new version is live and healthy. A run's result is the deploy's result, so
+# this workflow's history is the source for the delivery metrics (BILLIAMVT-30).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time; a later merge waits instead of interrupting
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy backend to Render
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://sdev-590-project.onrender.com
+    env:
+      RENDER_API: https://api.render.com/v1
+      SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      HEALTH_URL: https://sdev-590-project.onrender.com/actuator/health
+      # The commit CI tested (or main's head for a manual run)
+      COMMIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Start Render deploy
+        id: start
+        run: |
+          response=$(curl -sS --fail-with-body -X POST "$RENDER_API/services/$SERVICE_ID/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"commitId\": \"$COMMIT_SHA\"}")
+          deploy_id=$(jq -r '.id // empty' <<< "$response")
+          if [ -z "$deploy_id" ]; then
+            echo "::error::Render did not start a deploy (another deploy may be in progress): $response"
+            exit 1
+          fi
+          echo "Started deploy $deploy_id for commit $COMMIT_SHA"
+          echo "deploy_id=$deploy_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for deploy to go live
+        env:
+          DEPLOY_ID: ${{ steps.start.outputs.deploy_id }}
+        run: |
+          for attempt in $(seq 1 60); do
+            status=$(curl -sS --fail-with-body "$RENDER_API/services/$SERVICE_ID/deploys/$DEPLOY_ID" \
+              -H "Authorization: Bearer $RENDER_API_KEY" | jq -r '.status')
+            echo "$(date -u +%H:%M:%S) $status"
+            case "$status" in
+              live)
+                exit 0 ;;
+              build_failed|update_failed|pre_deploy_failed|canceled|deactivated)
+                echo "::error::Render deploy $DEPLOY_ID ended with status $status"
+                exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error::Render deploy $DEPLOY_ID did not go live within 15 minutes"
+          exit 1
+
+      - name: Check production health
+        run: |
+          for attempt in $(seq 1 6); do
+            body=$(curl -sS --max-time 90 "$HEALTH_URL" || true)
+            echo "$(date -u +%H:%M:%S) $body"
+            if [ "$(jq -r '.status // empty' <<< "$body" 2>/dev/null)" = "UP" ]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Health check at $HEALTH_URL did not report UP"
+          exit 1
