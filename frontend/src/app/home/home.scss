@@ -1,0 +1,13 @@
+.status {
+  border-left: 4px solid #9ca3af;
+  padding: 0.5rem 1rem;
+
+  &[data-state='up'] {
+    border-color: #16a34a;
+  }
+
+  &[data-state='down'],
+  &[data-state='unreachable'] {
+    border-color: #dc2626;
+  }
+}

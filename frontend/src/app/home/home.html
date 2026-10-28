@@ -1,0 +1,17 @@
+<section class="status" [attr.data-state]="state()">
+  <h2>Server status</h2>
+  @switch (state()) {
+    @case ('checking') {
+      <p>Checking the server… The server sleeps when it isn't in use, so the first check can take up to a minute.</p>
+    }
+    @case ('up') {
+      <p>The server and database are running.</p>
+    }
+    @case ('down') {
+      <p>The server is running but reports a problem (status: {{ reportedStatus() }}).</p>
+    }
+    @case ('unreachable') {
+      <p>The server couldn't be reached. Try again in a minute.</p>
+    }
+  }
+</section>
