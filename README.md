@@ -52,7 +52,17 @@ From the `frontend/` directory, install dependencies once with `npm install`, th
 ng serve
 ```
 
-Open http://localhost:4200. In development the app calls the backend at `http://localhost:8080`, so run the backend too (above); the `local` profile allows the dev server's origin (CORS). The API URL for each build is set in `frontend/src/environments/`.
+Open http://localhost:4200. In development the app calls the backend at `http://localhost:8080`, so run the backend too (above); the `local` profile allows the dev server's origin (CORS). The API URL for each build is set in `frontend/src/environments/`. Keep the dev server on port 4200: that's the only local origin the backend allows.
+
+### Accounts and login
+
+Create an account from the app's **Create an account** page; registering also logs you in. Login uses JWTs ([decision 0004](docs/decisions/0004-authentication.md)):
+
+- `POST /api/auth/register` and `POST /api/auth/login` return a token valid for 30 days. The front end keeps it in the browser's `localStorage` and sends it as `Authorization: Bearer <token>`.
+- Every other `/api/**` endpoint requires the token; `GET /api/me` returns the logged-in account. `/actuator/health` stays public.
+- Logging out discards the token in the browser. A token stops working if its account is deleted.
+
+The `local` profile includes a development-only signing secret, so no setup is needed locally.
 
 ## Database
 
@@ -98,9 +108,20 @@ Without the `local` profile (as in production), the jar needs the `SPRING_DATASO
   - Locally: start Postgres with `docker compose up -d` and run with the `local` profile (`mvn spring-boot:run` does this).
   - On Render: set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` under the service's **Environment**, then rerun **Actions → Deploy → Run workflow**.
 
+- **"Binding to target ... JwtProperties failed ... Property: app.jwt.secret ... must not be blank"** at startup: the JWT signing secret is missing.
+  - Locally: run with the `local` profile, which has a development secret.
+  - On Render: set `APP_JWT_SECRET` (at least 32 characters, e.g. from `openssl rand -base64 32`) under the service's **Environment**, then rerun the Deploy workflow. Changing it logs everyone out.
+
 ## Deployment
 
-The backend runs on [Render](https://render.com), built from `backend/Dockerfile`, with Postgres on [Neon](https://neon.com); Render supplies the connection through the `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` environment variables. The front end is served by GitHub Pages at https://billiamvt.github.io/SDEV-590-Project/.
+The backend runs on [Render](https://render.com), built from `backend/Dockerfile`, with Postgres on [Neon](https://neon.com). Render supplies its configuration as environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` | Neon database connection |
+| `APP_JWT_SECRET` | Signs and verifies login tokens. At least 32 characters; never commit it. |
+
+The front end is served by GitHub Pages at https://billiamvt.github.io/SDEV-590-Project/.
 
 CI and deploys run only for the parts of the repo a change touches (`.github/scripts/changed-parts.sh`): `backend/`, `frontend/`, or both. Changes to the workflows count as both. A change that touches neither, such as this README, skips the builds and deploys nothing.
 

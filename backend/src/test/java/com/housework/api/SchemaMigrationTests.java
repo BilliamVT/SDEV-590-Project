@@ -3,8 +3,6 @@ package com.housework.api;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,8 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Checks that the Flyway migrations produce a schema whose delete rules
  * support account deletion (BILLIAMVT-41). Each test rolls back.
  */
-@Import(TestContainersConfiguration.class)
-@SpringBootTest
+@IntegrationTest
 @Transactional
 class SchemaMigrationTests {
 
@@ -32,7 +29,7 @@ class SchemaMigrationTests {
 	@BeforeEach
 	void createHouseholdWithCompletedTask() {
 		householdId = insert("insert into household (name, time_zone) values ('Test home', 'America/New_York') returning id");
-		userId = insert("insert into app_user (household_id, email, display_name) values (?, 'pat@example.com', 'Pat')"
+		userId = insert("insert into app_user (household_id, email, display_name, password_hash) values (?, 'pat@example.com', 'Pat', 'x')"
 				+ " returning id", householdId);
 		taskId = insert("insert into task (household_id, name, recurrence_rule, starts_on)"
 				+ " values (?, 'Vacuum', 'FREQ=WEEKLY;BYDAY=SA', date '2026-10-25')"
@@ -92,14 +89,14 @@ class SchemaMigrationTests {
 	@Test
 	void emailsMustBeStoredLowercase() {
 		assertThatThrownBy(() -> jdbc
-			.sql("insert into app_user (email, display_name) values ('Pat@Example.com', 'Pat')")
+			.sql("insert into app_user (email, display_name, password_hash) values ('Pat@Example.com', 'Pat', 'x')")
 			.update()).isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test
 	void emailsAreUnique() {
 		assertThatThrownBy(() -> jdbc
-			.sql("insert into app_user (email, display_name) values ('pat@example.com', 'Pat again')")
+			.sql("insert into app_user (email, display_name, password_hash) values ('pat@example.com', 'Pat again', 'x')")
 			.update()).isInstanceOf(DataIntegrityViolationException.class);
 	}
 

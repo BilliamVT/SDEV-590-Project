@@ -1,0 +1,46 @@
+// Login and register pages: a narrow column, centered on wide screens
+:host {
+  display: block;
+  max-width: 22rem;
+  margin: 0 auto;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+label {
+  margin-top: 0.75rem;
+  font-weight: 600;
+}
+
+input {
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: 1px solid #9ca3af;
+  border-radius: 4px;
+}
+
+button {
+  margin-top: 1rem;
+  padding: 0.6rem;
+  font-size: 1rem;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: wait;
+  }
+}
+
+.field-error,
+.form-error {
+  margin: 0.25rem 0 0;
+  color: #b91c1c;
+}
+
+.hint {
+  color: #4b5563;
+  font-size: 0.9rem;
+}

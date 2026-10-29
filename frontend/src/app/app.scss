@@ -4,3 +4,22 @@
   margin: 0 auto;
   padding: 1rem;
 }
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+
+  // Logged out, the header is just the title: center it over the centered login form
+  &.signed-out {
+    justify-content: center;
+  }
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
