@@ -28,7 +28,7 @@ class SchemaMigrationTests {
 
 	@BeforeEach
 	void createHouseholdWithCompletedTask() {
-		householdId = insert("insert into household (name, time_zone) values ('Test home', 'America/New_York') returning id");
+		householdId = insert("insert into household (name, time_zone, invite_code) values ('Test home', 'America/New_York', 'TESTCODE') returning id");
 		userId = insert("insert into app_user (household_id, email, display_name, password_hash) values (?, 'pat@example.com', 'Pat', 'x')"
 				+ " returning id", householdId);
 		taskId = insert("insert into task (household_id, name, recurrence_rule, starts_on)"

@@ -7,6 +7,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.housework.api.auth.EmailAlreadyRegisteredException;
+import com.housework.api.household.AlreadyInHouseholdException;
+import com.housework.api.household.InvalidTimeZoneException;
+import com.housework.api.household.InviteCodeNotFoundException;
+import com.housework.api.household.NoHouseholdException;
 
 /**
  * Turns application exceptions into RFC 9457 problem responses. Validation errors (400)
@@ -23,6 +27,21 @@ class ApiExceptionHandler {
 	@ExceptionHandler(BadCredentialsException.class)
 	ProblemDetail badCredentials(BadCredentialsException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
+
+	@ExceptionHandler({ NoHouseholdException.class, InviteCodeNotFoundException.class })
+	ProblemDetail notFound(RuntimeException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
+
+	@ExceptionHandler(AlreadyInHouseholdException.class)
+	ProblemDetail alreadyInHousehold(AlreadyInHouseholdException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	@ExceptionHandler(InvalidTimeZoneException.class)
+	ProblemDetail invalidTimeZone(InvalidTimeZoneException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
 	}
 
 }
