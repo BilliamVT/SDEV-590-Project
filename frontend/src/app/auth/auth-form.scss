@@ -19,7 +19,7 @@ label {
 input {
   padding: 0.5rem;
   font-size: 1rem;
-  border: 1px solid #9ca3af;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
 }
 
@@ -37,10 +37,10 @@ button {
 .field-error,
 .form-error {
   margin: 0.25rem 0 0;
-  color: #b91c1c;
+  color: var(--color-error);
 }
 
 .hint {
-  color: #4b5563;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
