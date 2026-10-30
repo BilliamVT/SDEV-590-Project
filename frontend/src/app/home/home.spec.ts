@@ -4,6 +4,7 @@ import { NEVER, Observable, of, throwError } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
 import { HealthService } from '../health/health.service';
+import { HouseholdService } from '../household/household.service';
 import { Home } from './home';
 
 describe('Home', () => {
@@ -12,6 +13,7 @@ describe('Home', () => {
       imports: [Home],
       providers: [
         { provide: HealthService, useValue: { status: () => status } },
+        { provide: HouseholdService, useValue: { load: () => NEVER } },
         { provide: AuthService, useValue: { user: signal({ id: 2, email: 'bill@example.com', displayName: 'Bill' }) } },
       ],
     }).compileComponents();

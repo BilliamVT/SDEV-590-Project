@@ -1,5 +1,7 @@
 <p class="welcome">Welcome, {{ auth.user()?.displayName }}.</p>
 
+<app-household-card />
+
 <section class="status" [attr.data-state]="state()">
   <h2>Server status</h2>
   @switch (state()) {
