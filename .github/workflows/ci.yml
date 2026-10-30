@@ -62,6 +62,16 @@ jobs:
           name: surefire-reports
           path: backend/target/surefire-reports/
 
+      # Coverage report (target/site/jacoco/index.html); the build fails if any
+      # package is below coverage.minimum in pom.xml
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/target/site/jacoco/
+          if-no-files-found: ignore
+
   frontend:
     name: Frontend build and test
     needs: changes

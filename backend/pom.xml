@@ -15,6 +15,8 @@
 	<description>Housework scheduling app backend</description>
 	<properties>
 		<java.version>25</java.version>
+		<!-- Minimum line coverage for every package (BILLIAMVT-35); override with -Dcoverage.minimum=0.70 -->
+		<coverage.minimum>0.80</coverage.minimum>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -103,6 +105,50 @@
 						<profile>local</profile>
 					</profiles>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.16</version>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>check</id>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<!-- Only main() lives here; it is not run by the tests -->
+							<excludes>
+								<exclude>com/housework/api/HouseworkApiApplication.class</exclude>
+							</excludes>
+							<rules>
+								<rule>
+									<element>PACKAGE</element>
+									<limits>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>${coverage.minimum}</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>
