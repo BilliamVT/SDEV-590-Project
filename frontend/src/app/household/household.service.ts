@@ -25,6 +25,11 @@ export class HouseholdService {
     return this.http.post<Household>(this.url, { name, timeZone: browserTimeZone() });
   }
 
+  /** Changes the household's settings (BILLIAMVT-46). */
+  update(changes: { name: string }): Observable<Household> {
+    return this.http.patch<Household>(this.url, changes);
+  }
+
   join(inviteCode: string): Observable<Household> {
     return this.http.post<Household>(`${this.url}/join`, { inviteCode });
   }

@@ -3,7 +3,7 @@
   @if (auth.user(); as user) {
     <div class="account">
       <span>Signed in as {{ user.displayName }}</span>
-      <a routerLink="/account">Account</a>
+      <a routerLink="/settings">Settings</a>
       <button type="button" (click)="logout()">Log out</button>
     </div>
   }

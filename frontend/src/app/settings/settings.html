@@ -1,0 +1,62 @@
+<h2>Settings</h2>
+
+<section>
+  <h3>Household</h3>
+  @if (household(); as current) {
+    @if (renaming()) {
+      <form [formGroup]="renameForm" (ngSubmit)="saveName()" novalidate>
+        <label for="household-name">Household name</label>
+        <input id="household-name" type="text" formControlName="name" autocomplete="off" />
+        <p class="actions">
+          <button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save' }}</button>
+          <button type="button" (click)="cancelRename()" [disabled]="saving()">Cancel</button>
+        </p>
+      </form>
+    } @else {
+      <p class="setting">
+        <span>{{ current.name }}</span>
+        <button type="button" (click)="startRename(current)">Rename</button>
+      </p>
+    }
+    @if (renameError()) {
+      <p class="form-error" role="alert">{{ renameError() }}</p>
+    }
+  } @else if (householdLoaded()) {
+    <p>You don't belong to a household yet. <a routerLink="/">Set one up</a></p>
+  } @else {
+    <p>Loading…</p>
+  }
+</section>
+
+<section>
+  <h3>Account</h3>
+  @if (auth.user(); as user) {
+    <dl>
+      <dt>Name</dt>
+      <dd>{{ user.displayName }}</dd>
+      <dt>Email</dt>
+      <dd>{{ user.email }}</dd>
+    </dl>
+  }
+
+  <div class="danger">
+    <h4>Delete account</h4>
+    <p>Permanently delete your account. This can't be undone.</p>
+    @if (confirming()) {
+      <p class="warning">{{ consequence(household()) }}</p>
+      <form [formGroup]="form" (ngSubmit)="delete()" novalidate>
+        <label for="delete-password">Enter your password to confirm</label>
+        <input id="delete-password" type="password" formControlName="password" autocomplete="current-password" />
+        <p class="actions">
+          <button type="submit" [disabled]="deleting()">{{ deleting() ? 'Deleting…' : 'Permanently delete my account' }}</button>
+          <button type="button" (click)="cancel()" [disabled]="deleting()">Cancel</button>
+        </p>
+      </form>
+    } @else {
+      <button type="button" (click)="confirming.set(true)">Delete my account…</button>
+    }
+    @if (error()) {
+      <p class="form-error" role="alert">{{ error() }}</p>
+    }
+  </div>
+</section>

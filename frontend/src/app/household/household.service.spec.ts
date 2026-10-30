@@ -62,6 +62,14 @@ describe('HouseholdService', () => {
     expect(failed).toBe(true);
   });
 
+  it('renames the household', () => {
+    service.update({ name: 'The Flynn House' }).subscribe();
+
+    const request = http.expectOne({ method: 'PATCH', url });
+    expect(request.request.body).toEqual({ name: 'The Flynn House' });
+    request.flush(household);
+  });
+
   it('joins with an invite code', () => {
     service.join('k7qm-3xrp').subscribe();
 

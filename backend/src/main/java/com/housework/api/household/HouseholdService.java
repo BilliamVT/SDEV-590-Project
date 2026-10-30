@@ -83,6 +83,16 @@ public class HouseholdService {
 		}
 	}
 
+	/** Changes the household's settings; any member can. Names aren't logged. */
+	@Transactional
+	public HouseholdResponse update(long userId, String name) {
+		AppUser user = user(userId);
+		Household household = householdOf(user);
+		household.rename(name.strip());
+		log.info("User {} renamed household {}", user.getId(), household.getId());
+		return response(household);
+	}
+
 	/** Replaces the invite code; the old one stops working. */
 	@Transactional
 	public HouseholdResponse regenerateInviteCode(long userId) {

@@ -7,7 +7,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 import { Household } from '../household/household.models';
 import { HouseholdService } from '../household/household.service';
-import { Account } from './account';
+import { Settings } from './settings';
 
 const household = (memberCount: number): Household => ({
   id: 1,
@@ -17,23 +17,28 @@ const household = (memberCount: number): Household => ({
   members: Array.from({ length: memberCount }, (_, i) => ({ id: i + 1, displayName: `Member ${i + 1}` })),
 });
 
-describe('Account', () => {
-  async function render(current: Household | null, deleteAccount: () => Observable<void> = () => of(undefined)) {
+describe('Settings', () => {
+  async function render(
+    current: Household | null,
+    deleteAccount: () => Observable<void> = () => of(undefined),
+    update: (changes: { name: string }) => Observable<Household> = (changes) => of({ ...household(1), ...changes }),
+  ) {
+    const households = { load: () => of(current), update: vi.fn(update) };
     const auth = {
       user: signal({ id: 2, email: 'bill@example.com', displayName: 'Bill' }),
       deleteAccount: vi.fn(deleteAccount),
     };
     await TestBed.configureTestingModule({
-      imports: [Account],
+      imports: [Settings],
       providers: [
         provideRouter([]),
         { provide: AuthService, useValue: auth },
-        { provide: HouseholdService, useValue: { load: () => of(current) } },
+        { provide: HouseholdService, useValue: households },
       ],
     }).compileComponents();
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
-    const fixture = TestBed.createComponent(Account);
+    const fixture = TestBed.createComponent(Settings);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     const click = async (text: string) => {
@@ -45,8 +50,72 @@ describe('Account', () => {
       input.value = value;
       input.dispatchEvent(new Event('input'));
     };
-    return { auth, router, element, click, typePassword };
+    const typeName = (value: string) => {
+      const input = element.querySelector<HTMLInputElement>('#household-name')!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    };
+    return { auth, households, router, element, click, typePassword, typeName };
   }
+
+  describe('household', () => {
+    it('shows the household name', async () => {
+      const { element } = await render(household(2));
+      expect(element.textContent).toContain('433 Flynn Ave');
+    });
+
+    it('renames the household', async () => {
+      const { element, households, click, typeName } = await render(household(2));
+      await click('Rename');
+      expect(element.querySelector<HTMLInputElement>('#household-name')?.value).toBe('433 Flynn Ave');
+
+      typeName('  The Flynn House  ');
+      await click('Save');
+
+      expect(households.update).toHaveBeenCalledWith({ name: 'The Flynn House' });
+      expect(element.querySelector('#household-name')).toBeNull();
+      expect(element.textContent).toContain('The Flynn House');
+    });
+
+    it('cancelling keeps the old name', async () => {
+      const { element, households, click, typeName } = await render(household(2));
+      await click('Rename');
+      typeName('Something else');
+      await click('Cancel');
+
+      expect(households.update).not.toHaveBeenCalled();
+      expect(element.textContent).toContain('433 Flynn Ave');
+    });
+
+    it('asks for a name, and cancelling clears the message', async () => {
+      const { element, households, click, typeName } = await render(household(2));
+      await click('Rename');
+      typeName('');
+      await click('Save');
+
+      expect(households.update).not.toHaveBeenCalled();
+      expect(element.textContent).toContain('Enter a name of up to 100 characters.');
+
+      await click('Cancel');
+      expect(element.textContent).not.toContain('Enter a name of up to 100 characters.');
+    });
+
+    it('shows a server error and keeps the form open', async () => {
+      const failure = new HttpErrorResponse({ status: 0 });
+      const { element, click } = await render(household(2), undefined, () => throwError(() => failure));
+      await click('Rename');
+      await click('Save');
+
+      expect(element.textContent).toContain("The server couldn't be reached");
+      expect(element.querySelector('#household-name')).not.toBeNull();
+    });
+
+    it('points to the home page when the user has no household', async () => {
+      const { element } = await render(null);
+      expect(element.textContent).toContain("You don't belong to a household yet");
+      expect(element.querySelector('a[href="/"]')).not.toBeNull();
+    });
+  });
 
   it("shows the user's name and email", async () => {
     const { element } = await render(household(1));
