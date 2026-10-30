@@ -56,6 +56,10 @@ public class Household {
 		return inviteCode;
 	}
 
+	void rename(String name) {
+		this.name = name;
+	}
+
 	void replaceInviteCode(String inviteCode) {
 		this.inviteCode = inviteCode;
 	}

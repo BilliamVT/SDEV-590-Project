@@ -165,8 +165,39 @@ class HouseholdTests {
 	}
 
 	@Test
+	void anyMemberCanRenameTheHouseholdForEveryone() {
+		String alex = registerWithHousehold("alex@example.com", "Alex");
+		String blair = register("blair@example.com", "Blair");
+		join(blair, text(get(alex), "$.inviteCode"));
+
+		MvcTestResult renamed = rename(blair, "  433 Flynn Ave  ");
+
+		assertThat(renamed).hasStatusOk();
+		assertThat(text(renamed, "$.name")).isEqualTo("433 Flynn Ave");
+		assertThat(text(get(alex), "$.name")).isEqualTo("433 Flynn Ave");
+	}
+
+	@Test
+	void renameRejectsABlankOrLongName() {
+		String alex = registerWithHousehold("alex@example.com", "Alex");
+
+		assertThat(rename(alex, " ")).hasStatus(400);
+		assertThat(rename(alex, "x".repeat(101))).hasStatus(400);
+		assertThat(text(get(alex), "$.name")).isEqualTo("Alex's household");
+	}
+
+	@Test
+	void renameNeedsAHousehold() {
+		String pat = register("pat@example.com", "Pat");
+
+		assertThat(rename(pat, "Home")).hasStatus(404);
+	}
+
+	@Test
 	void householdEndpointsRequireLogin() {
 		assertThat(mvc.get().uri("/api/household")).hasStatus(401);
+		assertThat(mvc.patch().uri("/api/household").contentType(MediaType.APPLICATION_JSON)
+			.content("{\"name\": \"Home\"}")).hasStatus(401);
 		assertThat(mvc.post().uri("/api/household/join").contentType(MediaType.APPLICATION_JSON)
 			.content("{\"inviteCode\": \"ABCD2345\"}")).hasStatus(401);
 	}
@@ -198,6 +229,15 @@ class HouseholdTests {
 			.header(HttpHeaders.AUTHORIZATION, bearer(token))
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("{\"name\": \"%s\", \"timeZone\": \"%s\"}".formatted(name, timeZone))
+			.exchange();
+	}
+
+	private MvcTestResult rename(String token, String name) {
+		return mvc.patch()
+			.uri("/api/household")
+			.header(HttpHeaders.AUTHORIZATION, bearer(token))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"name\": \"%s\"}".formatted(name))
 			.exchange();
 	}
 

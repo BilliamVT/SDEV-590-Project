@@ -16,6 +16,10 @@ public final class HouseholdDtos {
 	public record CreateHouseholdRequest(@NotBlank @Size(max = 100) String name, @NotBlank @Size(max = 64) String timeZone) {
 	}
 
+	/** Household settings (BILLIAMVT-46). Later options become more fields here. */
+	public record UpdateHouseholdRequest(@NotBlank @Size(max = 100) String name) {
+	}
+
 	public record JoinHouseholdRequest(@NotBlank @Size(max = 32) String inviteCode) {
 	}
 

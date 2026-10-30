@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.housework.api.household.HouseholdDtos.CreateHouseholdRequest;
 import com.housework.api.household.HouseholdDtos.HouseholdResponse;
 import com.housework.api.household.HouseholdDtos.JoinHouseholdRequest;
+import com.housework.api.household.HouseholdDtos.UpdateHouseholdRequest;
 
 /** The logged-in user's household. Singular path, no IDs: see decision record 0005. */
 @RestController
@@ -36,6 +38,11 @@ class HouseholdController {
 	@ResponseStatus(HttpStatus.CREATED)
 	HouseholdResponse create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateHouseholdRequest request) {
 		return households.create(userId(jwt), request.name(), request.timeZone());
+	}
+
+	@PatchMapping
+	HouseholdResponse update(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateHouseholdRequest request) {
+		return households.update(userId(jwt), request.name());
 	}
 
 	@PostMapping("/join")
