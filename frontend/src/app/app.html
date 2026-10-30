@@ -1,8 +1,9 @@
 <header [class.signed-out]="!auth.user()">
-  <h1>Housework Scheduler</h1>
+  <h1><a routerLink="/">Housework Scheduler</a></h1>
   @if (auth.user(); as user) {
     <div class="account">
       <span>Signed in as {{ user.displayName }}</span>
+      <a routerLink="/account">Account</a>
       <button type="button" (click)="logout()">Log out</button>
     </div>
   }

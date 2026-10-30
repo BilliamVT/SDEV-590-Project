@@ -1,17 +1,21 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
 import { Login } from './login';
 
 describe('Login', () => {
-  async function render(login: () => Observable<unknown>) {
+  async function render(login: () => Observable<unknown>, queryParams: Record<string, string> = {}) {
     const auth = { login: vi.fn(login) };
     await TestBed.configureTestingModule({
       imports: [Login],
-      providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: auth },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(queryParams) } } },
+      ],
     }).compileComponents();
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -29,6 +33,16 @@ describe('Login', () => {
     };
     return { auth, router, element, type, submit };
   }
+
+  it('confirms when the user arrives after deleting their account', async () => {
+    const { element } = await render(() => of({}), { deleted: '1' });
+    expect(element.textContent).toContain('Your account has been deleted.');
+  });
+
+  it('shows no notice on a normal visit', async () => {
+    const { element } = await render(() => of({}));
+    expect(element.textContent).not.toContain('deleted');
+  });
 
   it('does not call the server when the form is invalid', async () => {
     const { auth, element, submit } = await render(() => of({}));
