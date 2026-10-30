@@ -1,0 +1,39 @@
+name: Delivery metrics
+
+# Run by hand (Actions → Delivery metrics → Run workflow). Results appear on the run's
+# summary page. With no inputs it reports every sprint in .github/scripts/sprints.json.
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: 'Optional start (ISO date-time, e.g. 2026-11-04T18:00:00Z) instead of the sprints'
+        required: false
+      to:
+        description: 'Optional end (ISO date-time); defaults to now'
+        required: false
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  metrics:
+    name: Report delivery metrics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Test the metrics script
+        run: node --test '.github/scripts/*.test.mjs'
+
+      - name: Report metrics
+        run: node .github/scripts/delivery-metrics.mjs ${FROM:+--from "$FROM"} ${TO:+--to "$TO"}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}

@@ -146,4 +146,16 @@ The backend deploy needs two repository secrets: `RENDER_API_KEY` (from Render's
 
 Add the `hotfix` label to any PR that fixes a problem in production. The delivery metrics use it to count deploys that shipped a defect (change failure rate), so a missing label undercounts failures.
 
+### Delivery metrics
+
+Deployment frequency, lead time and change failure rate per sprint come from GitHub's history (`.github/scripts/delivery-metrics.mjs`; definitions at the top of the script). To get them, run **Actions → Delivery metrics → Run workflow**; the results are on the run's summary page. With no inputs it reports every sprint that has started, from `.github/scripts/sprints.json`. Later sprints are listed at their planned start (Wednesday, 1:30 PM Eastern); if one starts at a different time, correct its line. To report a different range, fill in the optional `from` and `to` inputs.
+
+It also runs locally (Node 24), but without a token GitHub allows only 60 API requests an hour, about two runs:
+
+```bash
+node .github/scripts/delivery-metrics.mjs
+```
+
+Tests for the script: `node --test '.github/scripts/*.test.mjs'`.
+
 [Decision 0001](docs/decisions/0001-hosting-and-database.md) explains why these services were chosen.
