@@ -61,7 +61,7 @@ Create an account from the app's **Create an account** page; registering also lo
 - `POST /api/auth/register` and `POST /api/auth/login` return a token valid for 30 days. The front end keeps it in the browser's `localStorage` and sends it as `Authorization: Bearer <token>`.
 - Every other `/api/**` endpoint requires the token; `GET /api/me` returns the logged-in account. `/actuator/health` stays public.
 - Logging out discards the token in the browser. A token stops working if its account is deleted.
-- **Account → Delete account** permanently deletes the account after asking for the password (`DELETE /api/me`). The household keeps tasks the user completed, without their name; if they were its only member, the household and its tasks are deleted too.
+- **Settings → Delete account** permanently deletes the account after asking for the password (`DELETE /api/me`). The household keeps tasks the user completed, without their name; if they were its only member, the household and its tasks are deleted too.
 
 The `local` profile includes a development-only signing secret, so no setup is needed locally.
 
@@ -71,7 +71,7 @@ Everyone belongs to one household, which shares a schedule ([decision 0005](docs
 
 - After signing up, the home page asks you to **create a household** (you choose its name) or **join one** with an invite code. A new household uses the browser's time zone to decide what "today" is.
 - The home page then shows the household's members and its **invite code** to share. **New code** replaces the code, and the old one stops working.
-- **Join another household** moves you to a different one; if you were the only member of your old household, it's deleted (the app warns first). Renaming a household is planned (BILLIAMVT-46).
+- **Join another household** moves you to a different one; if you were the only member of your old household, it's deleted (the app warns first). Any member can rename it under **Settings → Household** (`PATCH /api/household`).
 - The API never takes a household ID: `/api/household` and later data endpoints always use the logged-in user's household, and another household's records return 404.
 
 ## Database
