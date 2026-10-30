@@ -87,6 +87,8 @@ mvn verify
 
 Tests run against a throwaway Postgres 18 container started by [Testcontainers](https://testcontainers.com), so Docker must be running. The Compose database isn't needed.
 
+`mvn verify` also measures test coverage with [JaCoCo](https://www.jacoco.org/jacoco/) and **fails the build if any package's line coverage is below 80%** (the application's `main()` class is excluded). The threshold is `coverage.minimum` in `backend/pom.xml`; to try a different value for one run, use `mvn verify -Dcoverage.minimum=0.70`. The report is at `backend/target/site/jacoco/index.html`; in CI, download it from the run's **coverage-report** artifact.
+
 Front-end tests (Vitest), from `frontend/`:
 
 ```bash
