@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
 import { errorMessage } from '../auth/error-message';
@@ -23,6 +23,8 @@ export class Login {
   protected readonly attempted = signal(false);
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
+  /** Set when the user arrives here right after deleting their account. */
+  protected readonly accountDeleted = inject(ActivatedRoute).snapshot.queryParamMap.has('deleted');
 
   protected submit(): void {
     this.attempted.set(true);

@@ -1,10 +1,10 @@
 import { Component, inject } from '@angular/core';
-import { Router, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
 
 import { AuthService } from './auth/auth.service';
 
 @Component({
-  imports: [RouterOutlet],
+  imports: [RouterLink, RouterOutlet],
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',

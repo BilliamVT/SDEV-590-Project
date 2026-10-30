@@ -24,6 +24,10 @@ public final class AuthDtos {
 	public record LoginRequest(@NotBlank String email, @NotBlank String password) {
 	}
 
+	/** The password confirms a permanent action. */
+	public record DeleteAccountRequest(@NotBlank String password) {
+	}
+
 	public record UserResponse(Long id, String email, String displayName) {
 
 		static UserResponse from(AppUser user) {

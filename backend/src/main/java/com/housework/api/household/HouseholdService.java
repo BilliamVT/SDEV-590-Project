@@ -65,11 +65,22 @@ public class HouseholdService {
 		user.moveToHousehold(target.getId());
 		users.saveAndFlush(user);
 		log.info("User {} joined household {}", user.getId(), target.getId());
-		if (previousId != null && users.countByHouseholdId(previousId) == 0) {
-			households.deleteById(previousId);
-			log.info("Deleted household {}: no members left", previousId);
-		}
+		deleteIfEmpty(previousId);
 		return response(target);
+	}
+
+	/**
+	 * Deletes a household once its last member has left (joined another one, or deleted their
+	 * account). The database removes its tasks and occurrences with it (V1 cascade).
+	 */
+	@Transactional
+	public void deleteIfEmpty(Long householdId) {
+		if (householdId != null && users.countByHouseholdId(householdId) == 0) {
+			households.deleteById(householdId);
+			// Run the delete (and the database's cascade to tasks) now, not at commit
+			households.flush();
+			log.info("Deleted household {}: no members left", householdId);
+		}
 	}
 
 	/** Replaces the invite code; the old one stops working. */

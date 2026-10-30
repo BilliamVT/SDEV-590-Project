@@ -38,6 +38,13 @@ export class AuthService {
       .pipe(tap((response) => this.start(response)));
   }
 
+  /** Permanently deletes the account (the password confirms it), then ends the session. */
+  deleteAccount(password: string): Observable<void> {
+    return this.http
+      .delete<void>(`${environment.apiUrl}/api/me`, { body: { password } })
+      .pipe(tap(() => this.logout()));
+  }
+
   /** Forgets the token. With JWTs there's nothing to tell the server. */
   logout(): void {
     localStorage.removeItem(STORAGE_KEY);

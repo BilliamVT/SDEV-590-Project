@@ -60,6 +60,32 @@ describe('AuthService', () => {
     expect(localStorage.getItem('housework.session')).toBeNull();
   });
 
+  it('deletes the account with the password, then ends the session', () => {
+    const auth = createService();
+    auth.login({ email: 'bill@example.com', password: 'correct-horse' }).subscribe();
+    http.expectOne(`${environment.apiUrl}/api/auth/login`).flush(response());
+
+    auth.deleteAccount('correct-horse').subscribe();
+    const request = http.expectOne(`${environment.apiUrl}/api/me`);
+    expect(request.request.method).toBe('DELETE');
+    expect(request.request.body).toEqual({ password: 'correct-horse' });
+    request.flush(null, { status: 204, statusText: 'No Content' });
+
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(localStorage.getItem('housework.session')).toBeNull();
+  });
+
+  it('stays logged in when deleting the account fails', () => {
+    const auth = createService();
+    auth.login({ email: 'bill@example.com', password: 'correct-horse' }).subscribe();
+    http.expectOne(`${environment.apiUrl}/api/auth/login`).flush(response());
+
+    auth.deleteAccount('wrong').subscribe({ error: () => undefined });
+    http.expectOne(`${environment.apiUrl}/api/me`).flush({ detail: 'Password is incorrect' }, { status: 403, statusText: 'Forbidden' });
+
+    expect(auth.isLoggedIn()).toBe(true);
+  });
+
   it('logging out forgets the session', () => {
     const auth = createService();
     auth.login({ email: 'bill@example.com', password: 'correct-horse' }).subscribe();

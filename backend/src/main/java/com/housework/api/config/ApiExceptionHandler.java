@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.housework.api.auth.EmailAlreadyRegisteredException;
+import com.housework.api.auth.IncorrectPasswordException;
 import com.housework.api.household.AlreadyInHouseholdException;
 import com.housework.api.household.InvalidTimeZoneException;
 import com.housework.api.household.InviteCodeNotFoundException;
@@ -27,6 +28,11 @@ class ApiExceptionHandler {
 	@ExceptionHandler(BadCredentialsException.class)
 	ProblemDetail badCredentials(BadCredentialsException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
+
+	@ExceptionHandler(IncorrectPasswordException.class)
+	ProblemDetail incorrectPassword(IncorrectPasswordException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
 	}
 
 	@ExceptionHandler({ NoHouseholdException.class, InviteCodeNotFoundException.class })
