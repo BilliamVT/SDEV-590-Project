@@ -64,6 +64,15 @@ Create an account from the app's **Create an account** page; registering also lo
 
 The `local` profile includes a development-only signing secret, so no setup is needed locally.
 
+### Households
+
+Everyone belongs to one household, which shares a schedule ([decision 0005](docs/decisions/0005-household-data-access.md)):
+
+- After signing up, the home page asks you to **create a household** (you choose its name) or **join one** with an invite code. A new household uses the browser's time zone to decide what "today" is.
+- The home page then shows the household's members and its **invite code** to share. **New code** replaces the code, and the old one stops working.
+- **Join another household** moves you to a different one; if you were the only member of your old household, it's deleted (the app warns first). Renaming a household is planned (BILLIAMVT-46).
+- The API never takes a household ID: `/api/household` and later data endpoints always use the logged-in user's household, and another household's records return 404.
+
 ## Database
 
 Postgres 18 (matching production on Neon). Schema changes are [Flyway](https://documentation.red-gate.com/flyway) migrations in `backend/src/main/resources/db/migration/`, applied automatically when the app starts.

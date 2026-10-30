@@ -64,4 +64,9 @@ public class AppUser {
 		return passwordHash;
 	}
 
+	/** Sets or changes the user's household (BILLIAMVT-37). */
+	public void moveToHousehold(Long householdId) {
+		this.householdId = householdId;
+	}
+
 }

@@ -1,0 +1,22 @@
+<section class="household">
+  <h2>Set up your household</h2>
+  <p class="hint">Everyone in a household shares one schedule. Create one, or join someone else's with their invite code.</p>
+
+  <h3>Create a household</h3>
+  <form class="join" [formGroup]="createForm" (ngSubmit)="create()" novalidate>
+    <label for="household-name">Name</label>
+    <input id="household-name" class="wide" type="text" formControlName="name" autocomplete="off" />
+    <button type="submit" [disabled]="busy()">Create household</button>
+  </form>
+
+  <h3>Join a household</h3>
+  <form class="join" [formGroup]="joinForm" (ngSubmit)="join()" novalidate>
+    <label for="setup-invite-code">Invite code</label>
+    <input id="setup-invite-code" class="code" type="text" formControlName="code" autocomplete="off" autocapitalize="characters" />
+    <button type="submit" [disabled]="busy()">Join household</button>
+  </form>
+
+  @if (error()) {
+    <p class="form-error" role="alert">{{ error() }}</p>
+  }
+</section>
