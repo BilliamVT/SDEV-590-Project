@@ -152,6 +152,15 @@ The backend deploy needs two repository secrets: `RENDER_API_KEY` (from Render's
 - Live health check: https://sdev-590-project.onrender.com/actuator/health
 - The free instance sleeps after 15 minutes without traffic, so the first request after that takes about a minute.
 
+### Logs
+
+Production logs are in Render: open the web service → **Logs**. Locally they're in the terminal running the backend.
+
+- **Every API request** gets one line with its method, path, status and duration, e.g. `GET /api/household 200 12 ms` (`RequestLoggingFilter`). Health checks and CORS preflight requests are skipped, and query strings, headers, tokens and bodies are never logged.
+- **Errors add a short reason** that never includes what the user typed, e.g. `POST /api/household/join 404 15 ms (invite code not found)`, `POST /api/auth/register 400 13 ms (invalid fields: email, password)`, or `GET /api/household 401 9 ms (no token)`. The response body still explains the error to the user. A `500` line also comes with Spring's stack trace; search for ` 500 ` to find them.
+- **Account and household events** (registered, logged in, created or joined a household, deleted an account) are logged by user and household ID only, never by email or name.
+- Slow responses right after a deploy or a cold start are expected on the free instance; a path that's slow every time is worth investigating.
+
 ### Hotfixes
 
 Add the `hotfix` label to any PR that fixes a problem in production. The delivery metrics use it to count deploys that shipped a defect (change failure rate), so a missing label undercounts failures.
