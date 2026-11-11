@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -34,6 +35,23 @@ class Ical4jRecurrenceCalculatorTests {
 				: Arrays.stream(expected.split(" ")).map(LocalDate::parse).toList();
 
 		assertThat(calculator.datesBetween(rule, startsOn, from, to)).containsExactlyElementsOf(dates);
+	}
+
+	/** WKST=SU keeps weeks Sunday to Saturday whatever the server's locale (BILLIAMVT-50). */
+	@Test
+	void severalDaysEveryTwoWeeksDontDependOnTheLocale() {
+		java.util.Locale original = java.util.Locale.getDefault();
+		try {
+			java.util.Locale.setDefault(java.util.Locale.GERMANY);
+			// Starts Sunday Nov 15: that week's Monday is Nov 16, then two weeks later
+			assertThat(new Ical4jRecurrenceCalculator().datesBetween("FREQ=WEEKLY;INTERVAL=2;WKST=SU;BYDAY=SU,MO",
+					LocalDate.of(2026, 11, 15), LocalDate.of(2026, 11, 15), LocalDate.of(2026, 11, 30)))
+				.containsExactly(LocalDate.of(2026, 11, 15), LocalDate.of(2026, 11, 16), LocalDate.of(2026, 11, 29),
+						LocalDate.of(2026, 11, 30));
+		}
+		finally {
+			java.util.Locale.setDefault(original);
+		}
 	}
 
 }

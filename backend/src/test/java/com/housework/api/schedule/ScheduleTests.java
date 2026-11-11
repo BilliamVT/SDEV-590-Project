@@ -52,7 +52,7 @@ class ScheduleTests {
 	void creatingATaskGeneratesFourWeeksAhead() {
 		String token = registerWithHousehold("pat@example.com");
 
-		long taskId = createTask(token, "{\"name\": \"Vacuum\", \"frequency\": \"WEEKLY\", \"dayOfWeek\": \"SATURDAY\"}");
+		long taskId = createTask(token, "{\"name\": \"Vacuum\", \"frequency\": \"WEEKLY\", \"daysOfWeek\": [\"SATURDAY\"]}");
 
 		LocalDate firstSaturday = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY));
 		List<LocalDate> expected = firstSaturday.datesUntil(today.plusWeeks(4).plusDays(1), java.time.Period.ofWeeks(1))
@@ -67,11 +67,26 @@ class ScheduleTests {
 		DayOfWeek day = today.getDayOfWeek().plus(4);
 
 		long taskId = createTask(token, """
-				{"name": "Sheets", "frequency": "EVERY_N_WEEKS", "interval": 2, "dayOfWeek": "%s", "startsOn": "%s"}
+				{"name": "Sheets", "frequency": "EVERY_N_WEEKS", "interval": 2, "daysOfWeek": ["%s"], "startsOn": "%s"}
 				""".formatted(day, today));
 
 		LocalDate first = today.with(TemporalAdjusters.nextOrSame(day));
 		assertThat(dates(taskId)).containsExactly(first, first.plusWeeks(2));
+	}
+
+	/** Weeks run Sunday to Saturday; days before the start date in its first week are left out. */
+	@Test
+	void everyTwoWeeksOnSeveralDaysStartsInTheStartDatesWeek() {
+		String token = registerWithHousehold("pat@example.com");
+		LocalDate wednesday = today.with(TemporalAdjusters.next(DayOfWeek.WEDNESDAY));
+
+		long taskId = createTask(token, """
+				{"name": "Laundry", "frequency": "EVERY_N_WEEKS", "interval": 2,
+				 "daysOfWeek": ["SATURDAY", "MONDAY", "THURSDAY"], "startsOn": "%s"}
+				""".formatted(wednesday));
+
+		assertThat(dates(taskId)).startsWith(wednesday.plusDays(1), wednesday.plusDays(3), wednesday.plusDays(12),
+				wednesday.plusDays(15), wednesday.plusDays(17));
 	}
 
 	@Test

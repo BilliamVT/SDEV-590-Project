@@ -146,13 +146,18 @@ public class TaskService {
 	/** The rule and start date for the form's schedule fields; checks a chosen start date. */
 	private static Schedule schedule(CreateTaskRequest request, LocalDate today) {
 		LocalDate startsOn = startsOn(request, today);
-		String rule = RecurrenceRules.build(request.frequency(), request.interval(), request.dayOfWeek(),
+		String rule = RecurrenceRules.build(request.frequency(), request.interval(), request.daysOfWeek(),
 				request.dayOfMonth(), startsOn);
 		if (request.frequency() == Frequency.EVERY_N_WEEKS) {
 			// Start the cycle on the first chosen weekday on or after the start date. Otherwise RFC 5545
 			// counts weeks from the start date's week and can skip its weekday, e.g. "every 2 weeks on
 			// Sunday" chosen on a Wednesday would first fall 11 days later instead of 4.
-			startsOn = startsOn.with(TemporalAdjusters.nextOrSame(request.dayOfWeek()));
+			LocalDate from = startsOn;
+			startsOn = request.daysOfWeek()
+				.stream()
+				.map(day -> from.with(TemporalAdjusters.nextOrSame(day)))
+				.min(LocalDate::compareTo)
+				.orElseThrow();
 		}
 		return new Schedule(rule, startsOn);
 	}
@@ -166,7 +171,8 @@ public class TaskService {
 		boolean chosenStart = CHOSEN_START.contains(request.frequency());
 		return current.frequency() != request.frequency()
 				|| (current.interval() != null && !current.interval().equals(request.interval()))
-				|| (current.dayOfWeek() != null && current.dayOfWeek() != request.dayOfWeek())
+				|| (current.daysOfWeek() != null
+						&& !current.daysOfWeek().equals(RecurrenceRules.sorted(request.daysOfWeek())))
 				|| (current.dayOfMonth() != null && !current.dayOfMonth().equals(request.dayOfMonth()))
 				|| (chosenStart && !Objects.equals(request.startsOn(), task.getStartsOn()));
 	}
