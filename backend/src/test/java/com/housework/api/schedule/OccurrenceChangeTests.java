@@ -4,6 +4,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 
 import com.jayway.jsonpath.JsonPath;
 import jakarta.persistence.EntityManager;
@@ -20,10 +21,10 @@ import com.housework.api.IntegrationTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Marking occurrences done or skipped, and undoing it (BILLIAMVT-25). */
+/** Marking occurrences done or skipped, undoing it, and deleting one occurrence (BILLIAMVT-25). */
 @IntegrationTest
 @Transactional
-class OccurrenceStatusTests {
+class OccurrenceChangeTests {
 
 	private static final ZoneId ZONE = ZoneId.of("America/New_York");
 
@@ -138,6 +139,57 @@ class OccurrenceStatusTests {
 			.content("{\"status\": \"DONE\"}")).hasStatus(401);
 	}
 
+	@Test
+	void deletingAnOccurrenceRemovesItForGood() {
+		String token = registerWithHousehold("pat@example.com");
+		long taskId = createDailyTask(token);
+		backdate(taskId, today.minusDays(2));
+		schedule(token, today.minusDays(2), today);
+		long id = occurrenceId(taskId, today.minusDays(1));
+		changeStatus(token, id, "DONE");
+
+		assertThat(delete(token, id)).hasStatus(204);
+
+		// Viewing the schedule again doesn't bring it back
+		String schedule = body(schedule(token, today.minusDays(1), today.minusDays(1)));
+		assertThat(JsonPath.<List<Object>>read(schedule, "$.occurrences")).isEmpty();
+		assertThat(delete(token, id)).hasStatus(404);
+	}
+
+	@Test
+	void aDeletedTasksOccurrenceCanBeDeleted() {
+		String token = registerWithHousehold("pat@example.com");
+		long taskId = createDailyTask(token);
+		long id = occurrenceId(taskId, today);
+		changeStatus(token, id, "DONE");
+		mvc.delete().uri("/api/tasks/{id}", taskId).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).exchange();
+
+		assertThat(delete(token, id)).hasStatus(204);
+
+		assertThat(JsonPath.<List<Object>>read(body(schedule(token, today, today)), "$.occurrences")).isEmpty();
+	}
+
+	@Test
+	void otherHouseholdsCantDeleteAnOccurrence() {
+		String alex = registerWithHousehold("alex@example.com");
+		String blair = registerWithHousehold("blair@example.com");
+		long id = occurrenceId(createDailyTask(alex), today);
+
+		assertThat(delete(blair, id)).hasStatus(404);
+		assertThat(mvc.delete().uri("/api/occurrences/{id}", id)).hasStatus(401);
+		assertThat(JsonPath.<List<Object>>read(body(schedule(alex, today, today)), "$.occurrences")).hasSize(1);
+	}
+
+	private MvcTestResult delete(String token, long id) {
+		MvcTestResult result = mvc.delete()
+			.uri("/api/occurrences/{id}", id)
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+			.exchange();
+		entityManager.flush();
+		entityManager.clear();
+		return result;
+	}
+
 	private MvcTestResult changeStatus(String token, long id, String status) {
 		MvcTestResult result = mvc.put()
 			.uri("/api/occurrences/{id}/status", id)
@@ -145,6 +197,7 @@ class OccurrenceStatusTests {
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("{\"status\": \"%s\"}".formatted(status))
 			.exchange();
+		entityManager.flush();
 		entityManager.clear();
 		return result;
 	}

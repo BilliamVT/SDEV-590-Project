@@ -94,6 +94,19 @@ public class ScheduleService {
 			.orElseThrow(OccurrenceNotFoundException::new);
 	}
 
+	/**
+	 * Deletes one occurrence for good, whatever its status or task (BILLIAMVT-25). Nothing records
+	 * the deletion, so editing a still-active task's schedule may regenerate an upcoming day.
+	 */
+	@Transactional
+	public void deleteOccurrence(long userId, long occurrenceId) {
+		Household household = households.householdOf(userId);
+		Occurrence occurrence = occurrences.findByIdAndHouseholdId(occurrenceId, household.getId())
+			.orElseThrow(OccurrenceNotFoundException::new);
+		occurrences.delete(occurrence);
+		log.info("User {} deleted occurrence {} of task {}", userId, occurrenceId, occurrence.getTaskId());
+	}
+
 	private LocalDate today(Household household) {
 		return LocalDate.now(clock.withZone(ZoneId.of(household.getTimeZone())));
 	}

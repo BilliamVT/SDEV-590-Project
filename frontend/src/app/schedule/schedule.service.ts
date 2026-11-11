@@ -19,4 +19,9 @@ export class ScheduleService {
   changeStatus(id: number, status: OccurrenceStatus): Observable<ScheduledOccurrence> {
     return this.http.put<ScheduledOccurrence>(`${environment.apiUrl}/api/occurrences/${id}/status`, { status });
   }
+
+  /** Deletes one occurrence for good (BILLIAMVT-25). */
+  delete(id: number): Observable<void> {
+    return this.http.delete<void>(`${environment.apiUrl}/api/occurrences/${id}`);
+  }
 }

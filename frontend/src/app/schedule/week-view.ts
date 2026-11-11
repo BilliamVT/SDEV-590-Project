@@ -98,6 +98,29 @@ export class WeekView {
     });
   }
 
+  /** Deletes this one day for good, after the browser's confirmation (wording to refine in BILLIAMVT-49). */
+  protected delete(occurrence: ScheduledOccurrence): void {
+    const question = `Delete "${occurrence.taskName}" on ${dayLabel(occurrence.date)} for good? This only removes this day, and it can't be undone.`;
+    if (!confirm(question)) {
+      return;
+    }
+    const id = occurrence.id;
+    this.saving.update((ids) => new Set(ids).add(id));
+    this.itemErrors.update((errors) => removeError(errors, id));
+    this.schedules.delete(id).subscribe({
+      next: () => {
+        this.schedule.update(
+          (schedule) => schedule && { ...schedule, occurrences: schedule.occurrences.filter((o) => o.id !== id) },
+        );
+        this.saving.update((ids) => removeId(ids, id));
+      },
+      error: (err: unknown) => {
+        this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
+        this.saving.update((ids) => removeId(ids, id));
+      },
+    });
+  }
+
   private go(weekStart: string): void {
     this.weekStart.set(weekStart);
     this.load();

@@ -40,8 +40,9 @@ describe('WeekView', () => {
   async function render(
     between: (from: string, to: string) => Observable<Schedule> = (from, to) => of(schedule(from, to)),
     changeStatus: (id: number, status: OccurrenceStatus) => Observable<ScheduledOccurrence> = () => NEVER,
+    remove: (id: number) => Observable<void> = () => of(undefined),
   ) {
-    const schedules = { between: vi.fn(between), changeStatus: vi.fn(changeStatus) };
+    const schedules = { between: vi.fn(between), changeStatus: vi.fn(changeStatus), delete: vi.fn(remove) };
     await TestBed.configureTestingModule({
       imports: [WeekView],
       providers: [{ provide: ScheduleService, useValue: schedules }],
@@ -207,6 +208,47 @@ describe('WeekView', () => {
 
       expect(element.querySelector('.occurrence .item-error')?.textContent).toContain("couldn't be reached");
       expect(button('Done').disabled).toBe(false);
+    });
+  });
+
+  describe('deleting one day', () => {
+    const vacuum = occurrence(1, 'Vacuum', '2026-11-11', { status: 'DONE', taskDeleted: true, completedByName: 'Pat' });
+    const withVacuum = (from: string, to: string) => of(schedule(from, to, [vacuum]));
+    afterEach(() => vi.restoreAllMocks());
+
+    it('asks first, then removes it from the week', async () => {
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const { schedules, element, click } = await render(withVacuum);
+
+      await click('Delete');
+
+      expect(confirm).toHaveBeenCalledWith(
+        'Delete "Vacuum" on Wednesday, Nov 11 for good? This only removes this day, and it can\'t be undone.',
+      );
+      expect(schedules.delete).toHaveBeenCalledWith(1);
+      expect(element.querySelector('.occurrence')).toBeNull();
+      expect(element.querySelectorAll('.day')[3].querySelector('.empty')?.textContent).toBe('Nothing scheduled');
+    });
+
+    it('does nothing if the user cancels', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const { schedules, element, click } = await render(withVacuum);
+
+      await click('Delete');
+
+      expect(schedules.delete).not.toHaveBeenCalled();
+      expect(element.querySelector('.occurrence')).not.toBeNull();
+    });
+
+    it('keeps it and shows an error when deleting fails', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const { element, click } = await render(withVacuum, undefined, () =>
+        throwError(() => new HttpErrorResponse({ status: 0 })),
+      );
+
+      await click('Delete');
+
+      expect(element.querySelector('.occurrence .item-error')?.textContent).toContain("couldn't be reached");
     });
   });
 });

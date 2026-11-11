@@ -28,4 +28,14 @@ describe('ScheduleService', () => {
     request.flush({});
     http.verify();
   });
+
+  it('deletes an occurrence', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const http = TestBed.inject(HttpTestingController);
+
+    TestBed.inject(ScheduleService).delete(7).subscribe();
+
+    expect(http.expectOne(`${environment.apiUrl}/api/occurrences/7`).request.method).toBe('DELETE');
+    http.verify();
+  });
 });

@@ -79,6 +79,15 @@
                           Undo
                         </button>
                       }
+                      <button
+                        type="button"
+                        class="delete"
+                        [attr.aria-label]="'Delete ' + occurrence.taskName + ' on ' + day.label"
+                        [disabled]="saving().has(occurrence.id)"
+                        (click)="delete(occurrence)"
+                      >
+                        Delete
+                      </button>
                     </div>
                     @if (itemErrors().get(occurrence.id); as message) {
                       <p class="item-error" role="alert">{{ message }}</p>
