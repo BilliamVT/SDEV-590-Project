@@ -74,6 +74,10 @@ Everyone belongs to one household, which shares a schedule ([decision 0005](docs
 - **Join another household** moves you to a different one; if you were the only member of your old household, it's deleted (the app warns first). Any member can rename it under **Settings → Household** (`PATCH /api/household`).
 - The API never takes a household ID: `/api/household` and later data endpoints always use the logged-in user's household, and another household's records return 404.
 
+### Tasks
+
+**Add a task** on the home page opens the New task form. A task repeats on a fixed menu of schedules ([decision 0003](docs/decisions/0003-recurrence-library.md)): every day, every week on a day, every 2–90 days, every 2–52 weeks on a day, every month on day 1–28 or the last day, or every 3 months. The form sends these choices to `POST /api/tasks`, and the backend builds and checks the RFC 5545 rule (e.g. `FREQ=WEEKLY;BYDAY=SA`); users never type rule text. Tasks belong to the logged-in user's household ([decision 0005](docs/decisions/0005-household-data-access.md)), and a task starts today in the household's time zone unless its schedule lets you pick a start date.
+
 ## Database
 
 Postgres 18 (matching production on Neon). Schema changes are [Flyway](https://documentation.red-gate.com/flyway) migrations in `backend/src/main/resources/db/migration/`, applied automatically when the app starts.

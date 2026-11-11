@@ -1,5 +1,7 @@
 <p class="welcome">Welcome, {{ auth.user()?.displayName }}.</p>
 
+<p><a class="primary-action" routerLink="/tasks/new">Add a task</a></p>
+
 <app-household-card />
 
 <section class="status" [attr.data-state]="state()">
