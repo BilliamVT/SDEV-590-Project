@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 
 import { CreateTaskRequest, Task } from './task.models';
@@ -31,6 +31,8 @@ describe('NewTask', () => {
       imports: [NewTask],
       providers: [provideRouter([]), { provide: TaskService, useValue: tasks }],
     }).compileComponents();
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const fixture = TestBed.createComponent(NewTask);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
@@ -48,11 +50,11 @@ describe('NewTask', () => {
       [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!.click();
       await fixture.whenStable();
     };
-    return { tasks, element, set, submit, click };
+    return { tasks, router, element, set, submit, click };
   }
 
-  it('creates a weekly task with only the fields it needs', async () => {
-    const { tasks, element, set, submit } = await render();
+  it('creates a weekly task with only the fields it needs, then shows the week', async () => {
+    const { tasks, router, set, submit } = await render();
     await set('task-name', '  Vacuum  ');
     await set('task-frequency', 'WEEKLY');
     await set('task-day', 'SATURDAY');
@@ -60,7 +62,9 @@ describe('NewTask', () => {
     await submit();
 
     expect(tasks.create).toHaveBeenCalledWith({ name: 'Vacuum', frequency: 'WEEKLY', dayOfWeek: 'SATURDAY', estimatedMinutes: 30 });
-    expect(element.textContent).toContain('Saved: Vacuum, every week on Saturday.');
+    expect(router.navigate).toHaveBeenCalledWith(['/'], {
+      state: { savedTask: { name: 'Vacuum', schedule: 'every week on Saturday' } },
+    });
   });
 
   it('shows only the fields each frequency uses', async () => {
@@ -170,14 +174,5 @@ describe('NewTask', () => {
     await submit();
 
     expect(element.textContent).toContain('Choose a start date within a year of today.');
-  });
-
-  it('can add another task after saving', async () => {
-    const { element, set, submit, click } = await render();
-    await set('task-name', 'Vacuum');
-    await submit();
-    await click('Add another');
-
-    expect(element.querySelector<HTMLInputElement>('#task-name')?.value).toBe('');
   });
 });

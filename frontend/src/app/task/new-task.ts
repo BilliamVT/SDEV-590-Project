@@ -1,9 +1,9 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { errorMessage } from '../auth/error-message';
-import { CreateTaskRequest, DayOfWeek, Frequency, Task } from './task.models';
+import { CreateTaskRequest, DayOfWeek, Frequency } from './task.models';
 import { TaskService } from './task.service';
 
 const DAYS: DayOfWeek[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
@@ -23,6 +23,7 @@ const INTERVAL_LIMITS: Partial<Record<Frequency, { max: number; unit: string }>>
 })
 export class NewTask {
   private readonly tasks = inject(TaskService);
+  private readonly router = inject(Router);
 
   protected readonly frequencies: { value: Frequency; label: string }[] = [
     { value: 'DAILY', label: 'Every day' },
@@ -50,7 +51,6 @@ export class NewTask {
   protected readonly attempted = signal(false);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly saved = signal<Task | null>(null);
 
   /** "Every week on Saturday" → "every week on Saturday", to follow "Saved: Vacuum," */
   protected lowerFirst(text: string): string {
@@ -128,22 +128,13 @@ export class NewTask {
     this.saving.set(true);
     this.error.set(null);
     this.tasks.create(this.request()).subscribe({
-      next: (task) => {
-        this.saved.set(task);
-        this.saving.set(false);
-      },
+      // Back to the week view, which shows a "Saved" notice (BILLIAMVT-39)
+      next: (task) => void this.router.navigate(['/'], { state: { savedTask: { name: task.name, schedule: this.lowerFirst(task.schedule) } } }),
       error: (err: unknown) => {
         this.error.set(errorMessage(err));
         this.saving.set(false);
       },
     });
-  }
-
-  protected addAnother(): void {
-    this.saved.set(null);
-    this.attempted.set(false);
-    this.form.controls.name.reset('');
-    this.form.controls.estimatedMinutes.reset(null);
   }
 
   /** Only the fields this frequency uses. */

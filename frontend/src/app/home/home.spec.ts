@@ -1,28 +1,50 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { NEVER, Observable, of, throwError } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
 import { HealthService } from '../health/health.service';
 import { HouseholdService } from '../household/household.service';
+import { ScheduleService } from '../schedule/schedule.service';
 import { Home } from './home';
 
 describe('Home', () => {
-  async function render(status: Observable<string>): Promise<HTMLElement> {
+  async function render(status: Observable<string>, savedTask?: { name: string; schedule: string }): Promise<HTMLElement> {
     await TestBed.configureTestingModule({
       imports: [Home],
       providers: [
         provideRouter([]),
         { provide: HealthService, useValue: { status: () => status } },
         { provide: HouseholdService, useValue: { load: () => NEVER } },
+        { provide: ScheduleService, useValue: { between: () => NEVER } },
         { provide: AuthService, useValue: { user: signal({ id: 2, email: 'bill@example.com', displayName: 'Bill' }) } },
       ],
     }).compileComponents();
+    if (savedTask) {
+      vi.spyOn(TestBed.inject(Router), 'currentNavigation').mockReturnValue({ extras: { state: { savedTask } } } as never);
+    }
     const fixture = TestBed.createComponent(Home);
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
   }
+
+  it('confirms a task that was just saved, with a link to add another', async () => {
+    const element = await render(NEVER, { name: 'Vacuum', schedule: 'every week on Saturday' });
+    const notice = element.querySelector('.notice');
+    expect(notice?.textContent).toContain('Saved: Vacuum, every week on Saturday.');
+    expect(notice?.querySelector('a[href="/tasks/new"]')?.textContent).toBe('Add another');
+  });
+
+  it('shows no notice on a normal visit', async () => {
+    const element = await render(NEVER);
+    expect(element.querySelector('.notice')).toBeNull();
+  });
+
+  it('shows the week view', async () => {
+    const element = await render(NEVER);
+    expect(element.querySelector('app-week-view')).not.toBeNull();
+  });
 
   it('links to adding a task', async () => {
     const element = await render(NEVER);
