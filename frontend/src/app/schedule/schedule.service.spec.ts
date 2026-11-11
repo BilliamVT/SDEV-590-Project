@@ -15,4 +15,17 @@ describe('ScheduleService', () => {
     http.expectOne(`${environment.apiUrl}/api/schedule?from=2026-11-08&to=2026-11-14`).flush({});
     http.verify();
   });
+
+  it('changes an occurrence status', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const http = TestBed.inject(HttpTestingController);
+
+    TestBed.inject(ScheduleService).changeStatus(7, 'DONE').subscribe();
+
+    const request = http.expectOne(`${environment.apiUrl}/api/occurrences/7/status`);
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual({ status: 'DONE' });
+    request.flush({});
+    http.verify();
+  });
 });

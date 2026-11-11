@@ -48,7 +48,8 @@
 
   ul {
     margin: 0.25rem 0 0.5rem;
-    padding-left: 1.25rem;
+    padding: 0;
+    list-style: none;
   }
 }
 
@@ -59,7 +60,12 @@
 }
 
 .occurrence {
-  margin: 0.15rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.5rem;
+  margin: 0.25rem 0;
 
   &.overdue {
     color: var(--color-error);
@@ -74,6 +80,33 @@
   &[data-status='DONE'] .name {
     text-decoration: line-through;
   }
+}
+
+.details {
+  flex: 1 1 12rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+
+  // Apple's minimum touch target (BILLIAMVT-49 restyles buttons app-wide)
+  button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+.status-label {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.item-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-error);
+  font-size: 0.9rem;
 }
 
 .minutes {

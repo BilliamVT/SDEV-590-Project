@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { NEVER, Observable, of, throwError } from 'rxjs';
 
-import { Schedule, ScheduledOccurrence } from './schedule.models';
+import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
 import { ScheduleService } from './schedule.service';
 import { WeekView } from './week-view';
 
@@ -16,6 +16,8 @@ const occurrence = (id: number, taskName: string, date: string, extra: Partial<S
   estimatedMinutes: null,
   overdue: false,
   taskDeleted: false,
+  completedByName: null,
+  completedAt: null,
   ...extra,
 });
 
@@ -35,8 +37,11 @@ describe('WeekView', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  async function render(between: (from: string, to: string) => Observable<Schedule> = (from, to) => of(schedule(from, to))) {
-    const schedules = { between: vi.fn(between) };
+  async function render(
+    between: (from: string, to: string) => Observable<Schedule> = (from, to) => of(schedule(from, to)),
+    changeStatus: (id: number, status: OccurrenceStatus) => Observable<ScheduledOccurrence> = () => NEVER,
+  ) {
+    const schedules = { between: vi.fn(between), changeStatus: vi.fn(changeStatus) };
     await TestBed.configureTestingModule({
       imports: [WeekView],
       providers: [{ provide: ScheduleService, useValue: schedules }],
@@ -49,7 +54,7 @@ describe('WeekView', () => {
       await fixture.whenStable();
     };
     const button = (text: string) => [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!;
-    return { schedules, element, click, button };
+    return { schedules, element, click, button, fixture };
   }
 
   it('shows this week, Sunday to Saturday, with today marked', async () => {
@@ -138,5 +143,70 @@ describe('WeekView', () => {
   it('shows other errors', async () => {
     const { element } = await render(() => throwError(() => new HttpErrorResponse({ status: 0 })));
     expect(element.textContent).toContain("couldn't be reached");
+  });
+
+  describe('marking done or skipped', () => {
+    const vacuum = occurrence(1, 'Vacuum', '2026-11-11');
+    const withVacuum = (from: string, to: string) => of(schedule(from, to, [vacuum]));
+    const labelOf = (element: HTMLElement) => element.querySelector('.status-label')?.textContent?.trim();
+
+    it('marks a task done and shows who did it', async () => {
+      const { schedules, element, click } = await render(withVacuum, (id, status) =>
+        of({ ...vacuum, status, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' }),
+      );
+
+      await click('Done');
+
+      expect(schedules.changeStatus).toHaveBeenCalledWith(1, 'DONE');
+      expect(element.querySelector('.occurrence')?.getAttribute('data-status')).toBe('DONE');
+      expect(labelOf(element)).toBe('✓ Done by Pat');
+      expect(element.querySelector('button[aria-label="Undo Vacuum"]')).not.toBeNull();
+    });
+
+    it('skips a task', async () => {
+      const { schedules, element, click } = await render(withVacuum, (id, status) =>
+        of({ ...vacuum, status, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' }),
+      );
+
+      await click('Skip');
+
+      expect(schedules.changeStatus).toHaveBeenCalledWith(1, 'SKIPPED');
+      expect(labelOf(element)).toBe('Skipped by Pat');
+    });
+
+    it('undoes back to pending', async () => {
+      const done = { ...vacuum, status: 'DONE' as const, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' };
+      const { schedules, element, click } = await render(
+        (from, to) => of(schedule(from, to, [done])),
+        () => of(vacuum),
+      );
+
+      await click('Undo');
+
+      expect(schedules.changeStatus).toHaveBeenCalledWith(1, 'PENDING');
+      expect(labelOf(element)).toBeUndefined();
+      expect(element.querySelector('button[aria-label="Mark Vacuum done"]')).not.toBeNull();
+    });
+
+    it('disables the buttons while saving', async () => {
+      const { element, click, button } = await render(withVacuum);
+
+      await click('Done');
+
+      expect(button('Done').disabled).toBe(true);
+      expect(button('Skip').disabled).toBe(true);
+      expect(element.querySelector('.occurrence')?.getAttribute('data-status')).toBe('PENDING');
+    });
+
+    it('shows an error on the item when saving fails', async () => {
+      const { element, click, button } = await render(withVacuum, () =>
+        throwError(() => new HttpErrorResponse({ status: 0 })),
+      );
+
+      await click('Done');
+
+      expect(element.querySelector('.occurrence .item-error')?.textContent).toContain("couldn't be reached");
+      expect(button('Done').disabled).toBe(false);
+    });
   });
 });

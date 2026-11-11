@@ -3,7 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { errorMessage } from '../auth/error-message';
 import { addDays, dayLabel, startOfWeek, toIsoDate, weekLabel } from './dates';
-import { Schedule, ScheduledOccurrence } from './schedule.models';
+import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
 import { ScheduleService } from './schedule.service';
 
 interface Day {
@@ -31,6 +31,10 @@ export class WeekView {
   protected readonly error = signal<string | null>(null);
   /** The user has no household yet; the household card asks them to set one up. */
   protected readonly noHousehold = signal(false);
+  /** Occurrences whose status change is on its way to the server */
+  protected readonly saving = signal<ReadonlySet<number>>(new Set());
+  /** A failed status change, shown on that occurrence */
+  protected readonly itemErrors = signal<ReadonlyMap<number, string>>(new Map());
 
   protected readonly days = computed<Day[]>(() => {
     const schedule = this.schedule();
@@ -75,6 +79,25 @@ export class WeekView {
     return occurrence.estimatedMinutes ? `${occurrence.estimatedMinutes} min` : null;
   }
 
+  /** Done, Skip, or Undo (back to pending); the item updates from the server's reply (BILLIAMVT-25). */
+  protected setStatus(occurrence: ScheduledOccurrence, status: OccurrenceStatus): void {
+    const id = occurrence.id;
+    this.saving.update((ids) => new Set(ids).add(id));
+    this.itemErrors.update((errors) => removeError(errors, id));
+    this.schedules.changeStatus(id, status).subscribe({
+      next: (updated) => {
+        this.schedule.update((schedule) =>
+          schedule && { ...schedule, occurrences: schedule.occurrences.map((o) => (o.id === id ? updated : o)) },
+        );
+        this.saving.update((ids) => removeId(ids, id));
+      },
+      error: (err: unknown) => {
+        this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
+        this.saving.update((ids) => removeId(ids, id));
+      },
+    });
+  }
+
   private go(weekStart: string): void {
     this.weekStart.set(weekStart);
     this.load();
@@ -95,4 +118,16 @@ export class WeekView {
       },
     });
   }
+}
+
+function removeId(ids: ReadonlySet<number>, id: number): Set<number> {
+  const copy = new Set(ids);
+  copy.delete(id);
+  return copy;
+}
+
+function removeError(errors: ReadonlyMap<number, string>, id: number): Map<number, string> {
+  const copy = new Map(errors);
+  copy.delete(id);
+  return copy;
 }
