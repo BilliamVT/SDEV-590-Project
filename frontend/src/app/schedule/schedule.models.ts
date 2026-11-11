@@ -9,8 +9,10 @@ export interface ScheduledOccurrence {
   originalDate: string;
   status: OccurrenceStatus;
   estimatedMinutes: number | null;
-  /** Pending on a day before the household's today */
+  /** Pending on a day before the household's today (never for deleted tasks) */
   overdue: boolean;
+  /** The task was deleted; its past occurrences stay as history (BILLIAMVT-22) */
+  taskDeleted: boolean;
 }
 
 export interface Schedule {

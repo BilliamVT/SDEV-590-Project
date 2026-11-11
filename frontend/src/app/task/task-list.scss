@@ -1,0 +1,76 @@
+.actions,
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.primary-action {
+  font-weight: 600;
+}
+
+.tasks {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task {
+  padding: 0.5rem 0.75rem;
+
+  & + .task {
+    border-top: 1px solid var(--color-neutral);
+  }
+
+  &.paused .name,
+  &.paused .schedule {
+    color: var(--color-text-muted);
+  }
+
+  .buttons {
+    margin: 0.25rem 0;
+  }
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.schedule {
+  flex-basis: 100%;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.badge {
+  padding: 0 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.warning {
+  margin: 0.5rem 0 0;
+  font-weight: 600;
+}
+
+.notice {
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid var(--color-success);
+}
+
+.hint {
+  color: var(--color-text-muted);
+}
+
+.form-error {
+  color: var(--color-error);
+}

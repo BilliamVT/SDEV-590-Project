@@ -1,4 +1,8 @@
-<h2>New task</h2>
+<h2>{{ taskId === null ? 'New task' : 'Edit task' }}</h2>
+
+@if (loading()) {
+  <p class="hint">Loading…</p>
+}
 
 <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
   <label for="task-name">Task</label>
@@ -43,7 +47,7 @@
 
   @if (needsStartDate()) {
     <label for="task-start">Starting</label>
-    <input id="task-start" type="date" formControlName="startsOn" [min]="today" />
+    <input id="task-start" type="date" formControlName="startsOn" [min]="minStart()" />
     @if (preview(); as text) {
       <p class="preview" aria-live="polite">{{ text }}</p>
     }
@@ -64,4 +68,4 @@
 
   <button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save task' }}</button>
 </form>
-<p><a routerLink="/">Cancel</a></p>
+<p><a [routerLink]="taskId === null ? '/' : '/tasks'">Cancel</a></p>

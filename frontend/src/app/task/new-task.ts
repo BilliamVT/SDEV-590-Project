@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { errorMessage } from '../auth/error-message';
 import { CreateTaskRequest, DayOfWeek, Frequency } from './task.models';
@@ -14,7 +14,10 @@ const INTERVAL_LIMITS: Partial<Record<Frequency, { max: number; unit: string }>>
   EVERY_N_WEEKS: { max: 52, unit: 'weeks' },
 };
 
-/** The fixed menu of schedules (decision record 0003); users never type rule text. */
+/**
+ * The New task form, and the Edit task form at /tasks/:id/edit (BILLIAMVT-22). The fixed menu of
+ * schedules (decision record 0003); users never type rule text.
+ */
 @Component({
   selector: 'app-new-task',
   imports: [ReactiveFormsModule, RouterLink],
@@ -24,6 +27,10 @@ const INTERVAL_LIMITS: Partial<Record<Frequency, { max: number; unit: string }>>
 export class NewTask {
   private readonly tasks = inject(TaskService);
   private readonly router = inject(Router);
+  /** Set when editing an existing task. */
+  protected readonly taskId = Number(inject(ActivatedRoute).snapshot.paramMap.get('id')) || null;
+  /** An edited task's current start date, which may already be in the past. */
+  private readonly originalStart = signal<string | null>(null);
 
   protected readonly frequencies: { value: Frequency; label: string }[] = [
     { value: 'DAILY', label: 'Every day' },
@@ -51,6 +58,37 @@ export class NewTask {
   protected readonly attempted = signal(false);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly loading = signal(this.taskId !== null);
+
+  constructor() {
+    if (this.taskId !== null) {
+      this.tasks.get(this.taskId).subscribe({
+        next: (task) => {
+          this.form.patchValue({
+            name: task.name,
+            frequency: task.frequency,
+            interval: task.interval ?? 2,
+            dayOfWeek: task.dayOfWeek ?? this.form.controls.dayOfWeek.value,
+            dayOfMonth: task.dayOfMonth ?? 1,
+            startsOn: task.startsOn,
+            estimatedMinutes: task.estimatedMinutes,
+          });
+          this.originalStart.set(task.startsOn);
+          this.loading.set(false);
+        },
+        error: (err: unknown) => {
+          this.error.set(errorMessage(err));
+          this.loading.set(false);
+        },
+      });
+    }
+  }
+
+  /** The date picker's minimum: today, or an edited task's existing start if that's earlier. */
+  protected minStart(): string {
+    const original = this.originalStart();
+    return original && original < this.today ? original : this.today;
+  }
 
   /** "Every week on Saturday" → "every week on Saturday", to follow "Saved: Vacuum," */
   protected lowerFirst(text: string): string {
@@ -80,7 +118,8 @@ export class NewTask {
    */
   protected preview(): string | null {
     const value = this.form.getRawValue();
-    if (!this.needsStartDate() || this.startInvalid() || this.intervalInvalid()) {
+    // An edited task's unchanged start can be in the past; "first time" would be misleading then
+    if (!this.needsStartDate() || this.startInvalid() || this.intervalInvalid() || value.startsOn! < this.today) {
       return null;
     }
     const [year, month, day] = value.startsOn!.split('-').map(Number);
@@ -110,8 +149,8 @@ export class NewTask {
 
   protected startInvalid(): boolean {
     const startsOn = this.form.controls.startsOn.value;
-    // yyyy-mm-dd strings compare in date order
-    return this.needsStartDate() && (!startsOn || startsOn < this.today);
+    // yyyy-mm-dd strings compare in date order; an edited task may keep its existing start
+    return this.needsStartDate() && (!startsOn || (startsOn < this.today && startsOn !== this.originalStart()));
   }
 
   protected intervalInvalid(): boolean {
@@ -127,9 +166,13 @@ export class NewTask {
     }
     this.saving.set(true);
     this.error.set(null);
-    this.tasks.create(this.request()).subscribe({
-      // Back to the week view, which shows a "Saved" notice (BILLIAMVT-39)
-      next: (task) => void this.router.navigate(['/'], { state: { savedTask: { name: task.name, schedule: this.lowerFirst(task.schedule) } } }),
+    const save = this.taskId === null ? this.tasks.create(this.request()) : this.tasks.update(this.taskId, this.request());
+    save.subscribe({
+      // A new task goes back to the week view, an edited one to the task list; both show a "Saved" notice
+      next: (task) =>
+        void this.router.navigate([this.taskId === null ? '/' : '/tasks'], {
+          state: { savedTask: { name: task.name, schedule: this.lowerFirst(task.schedule) } },
+        }),
       error: (err: unknown) => {
         this.error.set(errorMessage(err));
         this.saving.set(false);
