@@ -9,3 +9,5 @@
 /dataSources/
 /dataSources.local.xml
 /dataSources.xml
+# Personal inspection settings
+/inspectionProfiles/
