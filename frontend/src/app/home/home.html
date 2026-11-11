@@ -1,6 +1,15 @@
 <p class="welcome">Welcome, {{ auth.user()?.displayName }}.</p>
 
+@if (savedTask; as task) {
+  <p class="notice" role="status">
+    Saved: <strong>{{ task.name }}</strong>, {{ task.schedule }}.
+    <a routerLink="/tasks/new">Add another</a>
+  </p>
+}
+
 <p><a class="primary-action" routerLink="/tasks/new">Add a task</a></p>
+
+<app-week-view />
 
 <app-household-card />
 

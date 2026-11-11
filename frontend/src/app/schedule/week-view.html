@@ -1,0 +1,51 @@
+@if (!noHousehold()) {
+  <section class="week" aria-labelledby="week-title">
+    <div class="week-header">
+      <h2 id="week-title">{{ title() }}</h2>
+      <nav class="week-nav" aria-label="Choose a week">
+        <button type="button" (click)="previous()" [disabled]="loading()">‹ Previous</button>
+        <button type="button" (click)="today()" [disabled]="loading() || isThisWeek()">This week</button>
+        <button type="button" (click)="next()" [disabled]="loading() || atLimit()">Next ›</button>
+      </nav>
+    </div>
+    @if (atLimit()) {
+      <p class="hint">You can plan up to 2 years ahead.</p>
+    }
+
+    @if (error()) {
+      <p class="form-error" role="alert">{{ error() }}</p>
+    } @else if (loading() && !schedule()) {
+      <p class="hint">Loading your week… The server sleeps when it isn't in use, so this can take up to a minute.</p>
+    } @else {
+      <ol class="days" [class.refreshing]="loading()">
+        @for (day of days(); track day.date) {
+          <li class="day" [class.today]="day.isToday">
+            <h3>
+              {{ day.label }}
+              @if (day.isToday) {
+                <span class="today-label">Today</span>
+              }
+            </h3>
+            @if (day.occurrences.length === 0) {
+              <p class="empty">Nothing scheduled</p>
+            } @else {
+              <ul>
+                @for (occurrence of day.occurrences; track occurrence.id) {
+                  <li class="occurrence" [class.overdue]="occurrence.overdue" [attr.data-status]="occurrence.status">
+                    <span class="name">{{ occurrence.taskName }}</span>
+                    @if (minutes(occurrence); as text) {
+                      <span class="minutes">{{ text }}</span>
+                    }
+                    @if (occurrence.overdue) {
+                      <span class="overdue-label">Overdue</span>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </li>
+        }
+      </ol>
+    }
+  </section>
+}

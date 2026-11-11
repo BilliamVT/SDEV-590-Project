@@ -15,3 +15,12 @@
 .primary-action {
   font-weight: 600;
 }
+
+.notice {
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid var(--color-success);
+
+  a {
+    margin-left: 0.5rem;
+  }
+}
