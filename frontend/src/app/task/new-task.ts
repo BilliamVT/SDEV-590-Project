@@ -6,7 +6,8 @@ import { errorMessage } from '../auth/error-message';
 import { CreateTaskRequest, DayOfWeek, Frequency } from './task.models';
 import { TaskService } from './task.service';
 
-const DAYS: DayOfWeek[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+/** Sunday first, like the week view; the index matches JavaScript's getDay(). */
+const DAYS: DayOfWeek[] = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
 /** Same limits as the backend's RecurrenceRules. */
 const INTERVAL_LIMITS: Partial<Record<Frequency, { max: number; unit: string }>> = {
@@ -40,15 +41,16 @@ export class NewTask {
     { value: 'MONTHLY', label: 'Every month' },
     { value: 'QUARTERLY', label: 'Every 3 months' },
   ];
-  protected readonly days = DAYS.map((value) => ({ value, label: value.charAt(0) + value.slice(1).toLowerCase() }));
+  /** The day toggles: S M T W T F S, with each day's full name for screen readers */
+  protected readonly days = DAYS.map((value) => ({ value, letter: value.charAt(0), name: value.charAt(0) + value.slice(1).toLowerCase() }));
   protected readonly daysOfMonth = [...Array.from({ length: 28 }, (_, i) => ({ value: i + 1, label: `${i + 1}` })), { value: -1, label: 'Last day' }];
 
   protected readonly form = inject(FormBuilder).group({
     name: ['', [Validators.required, Validators.maxLength(100)]],
     frequency: ['WEEKLY' as Frequency, Validators.required],
     interval: [2 as number | null],
-    // Today's weekday: JavaScript counts Sunday as 0
-    dayOfWeek: [DAYS[(new Date().getDay() + 6) % 7]],
+    // None chosen at first: a preselected day would be easy to keep by accident when tapping another
+    daysOfWeek: [[] as DayOfWeek[]],
     dayOfMonth: [1],
     startsOn: [today()],
     estimatedMinutes: [null as number | null, [Validators.min(1), Validators.max(1440)]],
@@ -68,7 +70,7 @@ export class NewTask {
             name: task.name,
             frequency: task.frequency,
             interval: task.interval ?? 2,
-            dayOfWeek: task.dayOfWeek ?? this.form.controls.dayOfWeek.value,
+            daysOfWeek: task.daysOfWeek ?? [],
             dayOfMonth: task.dayOfMonth ?? 1,
             startsOn: task.startsOn,
             estimatedMinutes: task.estimatedMinutes,
@@ -103,6 +105,20 @@ export class NewTask {
     return this.frequency() === 'WEEKLY' || this.frequency() === 'EVERY_N_WEEKS';
   }
 
+  protected isChosen(day: DayOfWeek): boolean {
+    return this.form.controls.daysOfWeek.value!.includes(day);
+  }
+
+  /** Adds or removes a day, keeping them Sunday first. */
+  protected toggleDay(day: DayOfWeek): void {
+    const chosen = this.isChosen(day) ? this.form.controls.daysOfWeek.value!.filter((d) => d !== day) : [...this.form.controls.daysOfWeek.value!, day];
+    this.form.controls.daysOfWeek.setValue(DAYS.filter((d) => chosen.includes(d)));
+  }
+
+  protected daysInvalid(): boolean {
+    return this.needsDay() && this.form.controls.daysOfWeek.value!.length === 0;
+  }
+
   protected intervalLimit() {
     return INTERVAL_LIMITS[this.frequency()];
   }
@@ -113,13 +129,13 @@ export class NewTask {
 
   /**
    * When a task with a chosen start date first happens, matching the backend: every-N-weeks
-   * tasks start on the first chosen weekday on or after the date, and quarterly tasks after the
+   * tasks start on the earliest chosen weekday on or after the date, and quarterly tasks after the
    * 28th use the last day of the month. Null until the inputs are valid.
    */
   protected preview(): string | null {
     const value = this.form.getRawValue();
     // An edited task's unchanged start can be in the past; "first time" would be misleading then
-    if (!this.needsStartDate() || this.startInvalid() || this.intervalInvalid() || value.startsOn! < this.today) {
+    if (!this.needsStartDate() || this.startInvalid() || this.intervalInvalid() || this.daysInvalid() || value.startsOn! < this.today) {
       return null;
     }
     const [year, month, day] = value.startsOn!.split('-').map(Number);
@@ -127,8 +143,8 @@ export class NewTask {
     let then: string;
     switch (this.frequency()) {
       case 'EVERY_N_WEEKS': {
-        const wanted = (DAYS.indexOf(value.dayOfWeek!) + 1) % 7;
-        first = new Date(year, month - 1, day + ((wanted - first.getDay() + 7) % 7));
+        const daysUntil = Math.min(...value.daysOfWeek!.map((d) => (DAYS.indexOf(d) - first.getDay() + 7) % 7));
+        first = new Date(year, month - 1, day + daysUntil);
         then = `every ${value.interval} weeks`;
         break;
       }
@@ -161,7 +177,7 @@ export class NewTask {
 
   protected submit(): void {
     this.attempted.set(true);
-    if (this.form.invalid || this.intervalInvalid() || this.startInvalid()) {
+    if (this.form.invalid || this.intervalInvalid() || this.startInvalid() || this.daysInvalid()) {
       return;
     }
     this.saving.set(true);
@@ -185,7 +201,7 @@ export class NewTask {
     const value = this.form.getRawValue();
     const request: CreateTaskRequest = { name: value.name!.trim(), frequency: this.frequency() };
     if (this.intervalLimit()) request.interval = value.interval!;
-    if (this.needsDay()) request.dayOfWeek = value.dayOfWeek!;
+    if (this.needsDay()) request.daysOfWeek = value.daysOfWeek!;
     if (this.frequency() === 'MONTHLY') request.dayOfMonth = Number(value.dayOfMonth);
     if (this.needsStartDate()) request.startsOn = value.startsOn!;
     if (value.estimatedMinutes) request.estimatedMinutes = value.estimatedMinutes;

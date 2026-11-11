@@ -21,7 +21,7 @@ describe('NewTask (editing)', () => {
     schedule: 'Every 3 days',
     frequency: 'EVERY_N_DAYS',
     interval: 3,
-    dayOfWeek: null,
+    daysOfWeek: null,
     dayOfMonth: null,
     // Started before today: still allowed as long as it isn't changed
     startsOn: '2026-11-02',
@@ -29,9 +29,9 @@ describe('NewTask (editing)', () => {
     active: true,
   };
 
-  async function render() {
+  async function render(task: Task = existing) {
     const tasks = {
-      get: vi.fn(() => of(existing)),
+      get: vi.fn(() => of(task)),
       update: vi.fn((_id: number, request: CreateTaskRequest) => of({ ...existing, ...request, schedule: 'Every 4 days' })),
     };
     await TestBed.configureTestingModule({
@@ -100,5 +100,23 @@ describe('NewTask (editing)', () => {
 
     expect(tasks.update).not.toHaveBeenCalled();
     expect(element.textContent).toContain('Choose a start date from today on.');
+  });
+
+  it("shows a weekly task's days as chosen, and saves them unchanged (BILLIAMVT-50)", async () => {
+    const laundry: Task = {
+      ...existing,
+      name: 'Laundry',
+      recurrenceRule: 'FREQ=WEEKLY;BYDAY=MO,TH',
+      schedule: 'Every week on Monday and Thursday',
+      frequency: 'WEEKLY',
+      interval: null,
+      daysOfWeek: ['MONDAY', 'THURSDAY'],
+    };
+    const { tasks, element, submit } = await render(laundry);
+
+    const chosen = [...element.querySelectorAll('#task-day button[aria-pressed="true"]')].map((b) => b.getAttribute('aria-label'));
+    expect(chosen).toEqual(['Monday', 'Thursday']);
+    await submit();
+    expect(tasks.update).toHaveBeenCalledWith(7, expect.objectContaining({ frequency: 'WEEKLY', daysOfWeek: ['MONDAY', 'THURSDAY'] }));
   });
 });

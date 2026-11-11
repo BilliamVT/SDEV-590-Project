@@ -10,10 +10,10 @@ describe('TaskService', () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     const http = TestBed.inject(HttpTestingController);
 
-    TestBed.inject(TaskService).create({ name: 'Vacuum', frequency: 'WEEKLY', dayOfWeek: 'SATURDAY' }).subscribe();
+    TestBed.inject(TaskService).create({ name: 'Vacuum', frequency: 'WEEKLY', daysOfWeek: ['SATURDAY'] }).subscribe();
 
     const request = http.expectOne({ method: 'POST', url: `${environment.apiUrl}/api/tasks` });
-    expect(request.request.body).toEqual({ name: 'Vacuum', frequency: 'WEEKLY', dayOfWeek: 'SATURDAY' });
+    expect(request.request.body).toEqual({ name: 'Vacuum', frequency: 'WEEKLY', daysOfWeek: ['SATURDAY'] });
     request.flush({});
     http.verify();
   });

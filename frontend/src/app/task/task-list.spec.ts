@@ -13,7 +13,7 @@ const task = (id: number, name: string, extra: Partial<Task> = {}): Task => ({
   schedule: 'Every day',
   frequency: 'DAILY',
   interval: null,
-  dayOfWeek: null,
+  daysOfWeek: null,
   dayOfMonth: null,
   startsOn: '2026-11-11',
   estimatedMinutes: null,
