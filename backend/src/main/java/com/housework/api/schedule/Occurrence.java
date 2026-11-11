@@ -34,6 +34,7 @@ public class Occurrence {
 	@Enumerated(EnumType.STRING)
 	private OccurrenceStatus status;
 
+	/** Who marked it done or skipped (the columns cover skips too), and when; cleared on undo. */
 	private Long completedBy;
 
 	private Instant completedAt;
@@ -65,6 +66,16 @@ public class Occurrence {
 
 	public OccurrenceStatus getStatus() {
 		return status;
+	}
+
+	/** Done or skipped records who and when; back to pending (undo) clears them. Same status: no change. */
+	void changeStatus(OccurrenceStatus newStatus, long userId, Instant now) {
+		if (newStatus == status) {
+			return;
+		}
+		status = newStatus;
+		completedBy = newStatus == OccurrenceStatus.PENDING ? null : userId;
+		completedAt = newStatus == OccurrenceStatus.PENDING ? null : now;
 	}
 
 }

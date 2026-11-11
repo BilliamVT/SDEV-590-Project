@@ -30,6 +30,7 @@ import com.housework.api.household.InvalidTimeZoneException;
 import com.housework.api.household.InviteCodeNotFoundException;
 import com.housework.api.household.NoHouseholdException;
 import com.housework.api.schedule.InvalidRangeException;
+import com.housework.api.schedule.OccurrenceNotFoundException;
 import com.housework.api.task.InvalidScheduleException;
 import com.housework.api.task.TaskNotFoundException;
 
@@ -90,6 +91,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidRangeException.class)
 	ProblemDetail invalidRange(InvalidRangeException ex, HttpServletRequest request) {
 		return problem(request, HttpStatus.BAD_REQUEST, ex, "invalid range");
+	}
+
+	@ExceptionHandler(OccurrenceNotFoundException.class)
+	ProblemDetail occurrenceNotFound(OccurrenceNotFoundException ex, HttpServletRequest request) {
+		return problem(request, HttpStatus.NOT_FOUND, ex, "occurrence not found");
 	}
 
 	/** Spring's own exceptions; the response body is unchanged, only the reason is added. */

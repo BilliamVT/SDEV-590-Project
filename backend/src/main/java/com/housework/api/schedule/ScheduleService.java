@@ -4,6 +4,10 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.Clock;
+import java.time.Instant;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +22,8 @@ import com.housework.api.task.TaskRepository;
 /** The household's schedule for a date range, generated as needed (decision record 0005: own household only). */
 @Service
 public class ScheduleService {
+
+	private static final Logger log = LoggerFactory.getLogger(ScheduleService.class);
 
 	/** Longest range one request may ask for. */
 	static final int MAX_RANGE_DAYS = 42;
@@ -48,7 +54,7 @@ public class ScheduleService {
 	@Transactional
 	public ScheduleResponse schedule(long userId, LocalDate from, LocalDate to) {
 		Household household = households.householdOf(userId);
-		LocalDate today = LocalDate.now(clock.withZone(ZoneId.of(household.getTimeZone())));
+		LocalDate today = today(household);
 		LocalDate lastViewable = today.plusYears(MAX_YEARS_AHEAD);
 		if (to.isBefore(from)) {
 			throw new InvalidRangeException("The end date must be on or after the start date.");
@@ -68,6 +74,28 @@ public class ScheduleService {
 			.map(row -> OccurrenceResponse.from(row, today))
 			.toList();
 		return new ScheduleResponse(from, to, today, lastViewable, rows);
+	}
+
+	/**
+	 * Marks an occurrence done or skipped, or back to pending (undo). Any date, and deleted tasks'
+	 * occurrences too: the household decides what's true (BILLIAMVT-25).
+	 */
+	@Transactional
+	public OccurrenceResponse changeStatus(long userId, long occurrenceId, OccurrenceStatus status) {
+		Household household = households.householdOf(userId);
+		Occurrence occurrence = occurrences.findByIdAndHouseholdId(occurrenceId, household.getId())
+			.orElseThrow(OccurrenceNotFoundException::new);
+		OccurrenceStatus previous = occurrence.getStatus();
+		occurrence.changeStatus(status, userId, Instant.now(clock));
+		occurrences.flush();
+		log.info("User {} changed occurrence {} from {} to {}", userId, occurrenceId, previous, status);
+		return occurrences.findScheduled(household.getId(), occurrenceId)
+			.map(row -> OccurrenceResponse.from(row, today(household)))
+			.orElseThrow(OccurrenceNotFoundException::new);
+	}
+
+	private LocalDate today(Household household) {
+		return LocalDate.now(clock.withZone(ZoneId.of(household.getTimeZone())));
 	}
 
 }

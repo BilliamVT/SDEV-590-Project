@@ -2,6 +2,7 @@ package com.housework.api.schedule;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -36,19 +37,34 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 			  and (original_date >= :from or scheduled_date >= :from)""", nativeQuery = true)
 	int deleteUpcoming(@Param("taskId") long taskId, @Param("from") LocalDate from);
 
+	/** The schedule's row shape: the occurrence, its task, and who completed it (if anyone). */
+	String SCHEDULE_ROW = """
+			select new com.housework.api.schedule.ScheduleDtos$ScheduledOccurrence(
+			    o.id, t.id, t.name, o.scheduledDate, o.originalDate, o.status, t.estimatedMinutes,
+			    case when t.deletedAt is null then false else true end, u.displayName, o.completedAt)
+			from Occurrence o
+			join Task t on t.id = o.taskId
+			left join AppUser u on u.id = o.completedBy
+			""";
+
 	/**
 	 * A household's occurrences in a date range, by date and then task name (decision record 0005).
 	 * Deleted tasks' occurrences are included: they're history (BILLIAMVT-22).
 	 */
-	@Query("""
-			select new com.housework.api.schedule.ScheduleDtos$ScheduledOccurrence(
-			    o.id, t.id, t.name, o.scheduledDate, o.originalDate, o.status, t.estimatedMinutes,
-			    case when t.deletedAt is null then false else true end)
-			from Occurrence o, Task t
-			where t.id = o.taskId and t.householdId = :householdId
-			  and o.scheduledDate between :from and :to
+	@Query(SCHEDULE_ROW + """
+			where t.householdId = :householdId and o.scheduledDate between :from and :to
 			order by o.scheduledDate, t.name, o.id""")
 	List<ScheduledOccurrence> findSchedule(@Param("householdId") long householdId, @Param("from") LocalDate from,
 			@Param("to") LocalDate to);
+
+	/** One occurrence as a schedule row, only if it's in the household (decision record 0005). */
+	@Query(SCHEDULE_ROW + "where o.id = :id and t.householdId = :householdId")
+	Optional<ScheduledOccurrence> findScheduled(@Param("householdId") long householdId, @Param("id") long id);
+
+	/** An occurrence to change, only if it's in the household; deleted tasks' included (BILLIAMVT-25). */
+	@Query("""
+			select o from Occurrence o, Task t
+			where o.id = :id and t.id = o.taskId and t.householdId = :householdId""")
+	Optional<Occurrence> findByIdAndHouseholdId(@Param("id") long id, @Param("householdId") long householdId);
 
 }
