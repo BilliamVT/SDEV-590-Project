@@ -55,13 +55,30 @@ final class RecurrenceRules {
 		return rule;
 	}
 
+	/** The menu fields a rule was built from, to fill in the edit form (BILLIAMVT-22). */
+	record MenuChoice(Frequency frequency, Integer interval, DayOfWeek dayOfWeek, Integer dayOfMonth) {
+	}
+
+	/** Reads a rule from {@link #build} back into its menu fields. */
+	static MenuChoice parse(String rule) {
+		Map<String, String> parts = parts(rule);
+		Integer interval = parts.containsKey("INTERVAL") ? Integer.valueOf(parts.get("INTERVAL")) : null;
+		DayOfWeek day = parts.containsKey("BYDAY") ? dayOf(parts.get("BYDAY")) : null;
+		Integer dayOfMonth = parts.containsKey("BYMONTHDAY") ? Integer.valueOf(parts.get("BYMONTHDAY")) : null;
+		return switch (parts.get("FREQ")) {
+			case "DAILY" -> interval == null ? new MenuChoice(Frequency.DAILY, null, null, null)
+					: new MenuChoice(Frequency.EVERY_N_DAYS, interval, null, null);
+			case "WEEKLY" -> interval == null ? new MenuChoice(Frequency.WEEKLY, null, day, null)
+					: new MenuChoice(Frequency.EVERY_N_WEEKS, interval, day, null);
+			case "MONTHLY" -> interval == null ? new MenuChoice(Frequency.MONTHLY, null, null, dayOfMonth)
+					: new MenuChoice(Frequency.QUARTERLY, null, null, null);
+			default -> throw new IllegalArgumentException("Not a rule from the task menu: " + rule);
+		};
+	}
+
 	/** A rule from {@link #build} in words, e.g. "Every 2 weeks on Saturday". */
 	static String describe(String rule) {
-		Map<String, String> parts = new HashMap<>();
-		for (String part : rule.split(";")) {
-			String[] keyValue = part.split("=", 2);
-			parts.put(keyValue[0], keyValue[1]);
-		}
+		Map<String, String> parts = parts(rule);
 		int interval = Integer.parseInt(parts.getOrDefault("INTERVAL", "1"));
 		String day = parts.containsKey("BYDAY") ? " on " + dayName(parts.get("BYDAY")) : "";
 		return switch (parts.get("FREQ")) {
@@ -71,6 +88,15 @@ final class RecurrenceRules {
 					+ dayOfMonthName(Integer.parseInt(parts.get("BYMONTHDAY")));
 			default -> throw new IllegalArgumentException("Not a rule from the task menu: " + rule);
 		};
+	}
+
+	private static Map<String, String> parts(String rule) {
+		Map<String, String> parts = new HashMap<>();
+		for (String part : rule.split(";")) {
+			String[] keyValue = part.split("=", 2);
+			parts.put(keyValue[0], keyValue[1]);
+		}
+		return parts;
 	}
 
 	private static <T> T required(T value, String message) {
@@ -102,9 +128,14 @@ final class RecurrenceRules {
 
 	/** SA → Saturday */
 	private static String dayName(String byDay) {
+		return dayOf(byDay).getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+	}
+
+	/** SA → SATURDAY */
+	private static DayOfWeek dayOf(String byDay) {
 		for (DayOfWeek day : DayOfWeek.values()) {
 			if (byDay(day).equals(byDay)) {
-				return day.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+				return day;
 			}
 		}
 		throw new IllegalArgumentException("Unknown day: " + byDay);

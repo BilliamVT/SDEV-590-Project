@@ -22,6 +22,11 @@ export interface Task {
   recurrenceRule: string;
   /** In words, e.g. "Every week on Saturday" */
   schedule: string;
+  /** The menu fields the rule was built from, for the edit form */
+  frequency: Frequency;
+  interval: number | null;
+  dayOfWeek: DayOfWeek | null;
+  dayOfMonth: number | null;
   startsOn: string;
   estimatedMinutes: number | null;
   active: boolean;

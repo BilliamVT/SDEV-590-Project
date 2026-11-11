@@ -19,6 +19,7 @@ public final class TaskDtos {
 	 * The schedule comes as menu fields, never rule text (decision record 0003). Which fields are
 	 * needed depends on the frequency; RecurrenceRules checks them.
 	 */
+	/** Also the body for editing (PUT /api/tasks/{id}). */
 	public record CreateTaskRequest(
 			@NotBlank @Size(max = 100) String name,
 			@NotNull Frequency frequency,
@@ -34,12 +35,16 @@ public final class TaskDtos {
 			@Min(1) @Max(1440) Integer estimatedMinutes) {
 	}
 
-	public record TaskResponse(Long id, String name, String recurrenceRule, String schedule, LocalDate startsOn,
-			Integer estimatedMinutes, boolean active) {
+	/** Includes the menu fields the rule was built from, so the edit form can be filled in. */
+	public record TaskResponse(Long id, String name, String recurrenceRule, String schedule, Frequency frequency,
+			Integer interval, DayOfWeek dayOfWeek, Integer dayOfMonth, LocalDate startsOn, Integer estimatedMinutes,
+			boolean active) {
 
 		static TaskResponse from(Task task) {
+			RecurrenceRules.MenuChoice choice = RecurrenceRules.parse(task.getRecurrenceRule());
 			return new TaskResponse(task.getId(), task.getName(), task.getRecurrenceRule(),
-					RecurrenceRules.describe(task.getRecurrenceRule()), task.getStartsOn(), task.getEstimatedMinutes(),
+					RecurrenceRules.describe(task.getRecurrenceRule()), choice.frequency(), choice.interval(),
+					choice.dayOfWeek(), choice.dayOfMonth(), task.getStartsOn(), task.getEstimatedMinutes(),
 					task.isActive());
 		}
 

@@ -1,0 +1,58 @@
+<h2>Your tasks</h2>
+
+@if (savedTask; as saved) {
+  <p class="notice" role="status">Saved: <strong>{{ saved.name }}</strong>, {{ saved.schedule }}.</p>
+}
+
+<p class="actions">
+  <a class="primary-action" routerLink="/tasks/new">Add a task</a>
+  <a routerLink="/">Back to the week</a>
+</p>
+
+@if (error()) {
+  <p class="form-error" role="alert">{{ error() }}</p>
+}
+
+@if (list(); as tasks) {
+  @if (tasks.length === 0) {
+    <p class="hint">No tasks yet. Add your first one.</p>
+  } @else {
+    <ul class="tasks">
+      @for (task of tasks; track task.id) {
+        <li class="task" [class.paused]="!task.active">
+          <div class="summary">
+            <span class="name">{{ task.name }}</span>
+            @if (!task.active) {
+              <span class="badge">Paused</span>
+            }
+            <span class="schedule">
+              {{ task.schedule }}
+              @if (minutes(task); as text) {
+                · {{ text }}
+              }
+            </span>
+          </div>
+          @if (confirmingId() === task.id) {
+            <p class="warning">Delete {{ task.name }}? Past occurrences stay in its history; upcoming ones are removed.</p>
+            <p class="buttons">
+              <button type="button" (click)="delete(task)" [disabled]="busyId() === task.id">
+                {{ busyId() === task.id ? 'Deleting…' : 'Delete' }}
+              </button>
+              <button type="button" (click)="confirmingId.set(null)" [disabled]="busyId() === task.id">Cancel</button>
+            </p>
+          } @else {
+            <p class="buttons">
+              <a [routerLink]="['/tasks', task.id, 'edit']">Edit</a>
+              <button type="button" (click)="togglePause(task)" [disabled]="busyId() === task.id">
+                {{ task.active ? 'Pause' : 'Resume' }}
+              </button>
+              <button type="button" (click)="confirmingId.set(task.id)" [disabled]="busyId() === task.id">Delete…</button>
+            </p>
+          }
+        </li>
+      }
+    </ul>
+  }
+} @else if (!error()) {
+  <p class="hint">Loading your tasks…</p>
+}

@@ -15,6 +15,7 @@ const occurrence = (id: number, taskName: string, date: string, extra: Partial<S
   status: 'PENDING',
   estimatedMinutes: null,
   overdue: false,
+  taskDeleted: false,
   ...extra,
 });
 
@@ -80,6 +81,16 @@ describe('WeekView', () => {
     expect(day(1).querySelector('.overdue-label')?.textContent).toBe('Overdue');
     expect([...day(3).querySelectorAll('.name')].map((n) => n.textContent)).toEqual(['Dishes', 'Laundry']);
     expect(day(0).querySelector('.empty')?.textContent).toBe('Nothing scheduled');
+  });
+
+  it("shows a deleted task's past occurrences muted, as history", async () => {
+    const { element } = await render((from, to) =>
+      of(schedule(from, to, [occurrence(1, 'Old chore', '2026-11-09', { taskDeleted: true })])),
+    );
+
+    const item = element.querySelector('.occurrence');
+    expect(item?.classList).toContain('deleted');
+    expect(item?.querySelector('.overdue-label')).toBeNull();
   });
 
   it('moves between weeks', async () => {

@@ -31,7 +31,12 @@
             } @else {
               <ul>
                 @for (occurrence of day.occurrences; track occurrence.id) {
-                  <li class="occurrence" [class.overdue]="occurrence.overdue" [attr.data-status]="occurrence.status">
+                  <li
+                    class="occurrence"
+                    [class.overdue]="occurrence.overdue"
+                    [class.deleted]="occurrence.taskDeleted"
+                    [attr.data-status]="occurrence.status"
+                  >
                     <span class="name">{{ occurrence.taskName }}</span>
                     @if (minutes(occurrence); as text) {
                       <span class="minutes">{{ text }}</span>
