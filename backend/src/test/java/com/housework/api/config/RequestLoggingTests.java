@@ -101,11 +101,11 @@ class RequestLoggingTests {
 			.content("{\"inviteCode\": \"ZZZZ-ZZZZ\"}")
 			.exchange();
 		mvc.post().uri("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("{\"email\": ").exchange();
-		mvc.get().uri("/api/tasks").header(HttpHeaders.AUTHORIZATION, "Bearer " + token).exchange();
+		mvc.get().uri("/api/no-such-endpoint").header(HttpHeaders.AUTHORIZATION, "Bearer " + token).exchange();
 
 		assertThat(output).containsPattern("POST /api/household/join 404 \\d+ ms \\(invite code not found\\)")
 			.containsPattern("POST /api/auth/login 400 \\d+ ms \\(unreadable request body\\)")
-			.containsPattern("GET /api/tasks 404 \\d+ ms \\(no such endpoint\\)")
+			.containsPattern("GET /api/no-such-endpoint 404 \\d+ ms \\(no such endpoint\\)")
 			.doesNotContain("ZZZZ");
 	}
 

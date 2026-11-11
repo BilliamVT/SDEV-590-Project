@@ -1,0 +1,87 @@
+package com.housework.api.task;
+
+import java.time.Instant;
+import java.time.LocalDate;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+/**
+ * A recurring task (or, later, a one-off backlog item: no rule). Maps the task table (V1).
+ * Its occurrences are generated from the rule (BILLIAMVT-38).
+ */
+@Entity
+public class Task {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
+
+	private Long householdId;
+
+	private String name;
+
+	/** RFC 5545 rule built by RecurrenceRules, e.g. FREQ=WEEKLY;BYDAY=SA. */
+	private String recurrenceRule;
+
+	/** Where the recurrence starts (DTSTART). */
+	private LocalDate startsOn;
+
+	private Integer estimatedMinutes;
+
+	/** False while paused (BILLIAMVT-22). */
+	private boolean active = true;
+
+	/** Set when deleted (BILLIAMVT-22); deleted tasks are kept so their history stays. */
+	private Instant deletedAt;
+
+	@CreationTimestamp
+	private Instant createdAt;
+
+	@UpdateTimestamp
+	private Instant updatedAt;
+
+	protected Task() {
+	}
+
+	Task(Long householdId, String name, String recurrenceRule, LocalDate startsOn, Integer estimatedMinutes) {
+		this.householdId = householdId;
+		this.name = name;
+		this.recurrenceRule = recurrenceRule;
+		this.startsOn = startsOn;
+		this.estimatedMinutes = estimatedMinutes;
+	}
+
+	public Long getId() {
+		return id;
+	}
+
+	public Long getHouseholdId() {
+		return householdId;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public String getRecurrenceRule() {
+		return recurrenceRule;
+	}
+
+	public LocalDate getStartsOn() {
+		return startsOn;
+	}
+
+	public Integer getEstimatedMinutes() {
+		return estimatedMinutes;
+	}
+
+	public boolean isActive() {
+		return active;
+	}
+
+}

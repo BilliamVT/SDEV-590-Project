@@ -62,7 +62,7 @@ Use **ical4j 4.4.0** (Option A), behind a small interface of our own (e.g. `Recu
   | Every N days / weeks | `FREQ=DAILY;INTERVAL=N` or `FREQ=WEEKLY;INTERVAL=N;BYDAY=SA` |
   | Monthly on day 1–28 | `FREQ=MONTHLY;BYMONTHDAY=15` |
   | Monthly on the last day | `FREQ=MONTHLY;BYMONTHDAY=-1` |
-  | Quarterly | `FREQ=MONTHLY;INTERVAL=3` (on the start date's day) |
+  | Quarterly | `FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=15`: the start date's day, or the last day (`-1`) if it's after the 28th, so no quarter is skipped (BILLIAMVT-21) |
 
 - **Month-end:** offer days 1–28 plus "last day of the month" (`BYMONTHDAY=-1`), so no month is silently skipped. Note this in BILLIAMVT-21.
 - **Validation:** an invalid rule throws, so the API validates the rule when a task is saved (BILLIAMVT-21), never during generation.

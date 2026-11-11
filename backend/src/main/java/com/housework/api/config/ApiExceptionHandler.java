@@ -27,6 +27,7 @@ import com.housework.api.household.AlreadyInHouseholdException;
 import com.housework.api.household.InvalidTimeZoneException;
 import com.housework.api.household.InviteCodeNotFoundException;
 import com.housework.api.household.NoHouseholdException;
+import com.housework.api.task.InvalidScheduleException;
 
 /**
  * Turns exceptions into RFC 9457 problem responses: application exceptions here, and Spring's
@@ -70,6 +71,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidTimeZoneException.class)
 	ProblemDetail invalidTimeZone(InvalidTimeZoneException ex, HttpServletRequest request) {
 		return problem(request, HttpStatus.BAD_REQUEST, ex, "invalid time zone");
+	}
+
+	@ExceptionHandler(InvalidScheduleException.class)
+	ProblemDetail invalidSchedule(InvalidScheduleException ex, HttpServletRequest request) {
+		return problem(request, HttpStatus.BAD_REQUEST, ex, "invalid schedule");
 	}
 
 	/** Spring's own exceptions; the response body is unchanged, only the reason is added. */

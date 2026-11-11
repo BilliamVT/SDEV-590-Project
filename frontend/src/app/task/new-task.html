@@ -1,0 +1,75 @@
+<h2>New task</h2>
+
+@if (saved(); as task) {
+  <p class="notice" role="status">Saved: <strong>{{ task.name }}</strong>, {{ lowerFirst(task.schedule) }}.</p>
+  <p class="actions">
+    <button type="button" (click)="addAnother()">Add another</button>
+    <a routerLink="/">Back to home</a>
+  </p>
+} @else {
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <label for="task-name">Task</label>
+    <input id="task-name" type="text" formControlName="name" placeholder="e.g. Vacuum the living room" autocomplete="off" />
+    @if (attempted() && form.controls.name.invalid) {
+      <p class="field-error">Enter a task name of up to 100 characters.</p>
+    }
+
+    <label for="task-frequency">Repeats</label>
+    <select id="task-frequency" formControlName="frequency">
+      @for (option of frequencies; track option.value) {
+        <option [value]="option.value">{{ option.label }}</option>
+      }
+    </select>
+
+    @if (intervalLimit(); as limit) {
+      <label for="task-interval">Every how many {{ limit.unit }}?</label>
+      <input id="task-interval" type="number" formControlName="interval" min="2" [max]="limit.max" />
+      @if (attempted() && intervalInvalid()) {
+        <p class="field-error">Enter a whole number from 2 to {{ limit.max }}.</p>
+      }
+    }
+
+    @if (needsDay()) {
+      <label for="task-day">On</label>
+      <select id="task-day" formControlName="dayOfWeek">
+        @for (day of days; track day.value) {
+          <option [value]="day.value">{{ day.label }}</option>
+        }
+      </select>
+    }
+
+    @if (frequency() === 'MONTHLY') {
+      <label for="task-day-of-month">Day of the month</label>
+      <select id="task-day-of-month" formControlName="dayOfMonth">
+        @for (day of daysOfMonth; track day.value) {
+          <option [value]="day.value">{{ day.label }}</option>
+        }
+      </select>
+      <p class="hint">Days 29–31 aren't offered because not every month has them.</p>
+    }
+
+    @if (needsStartDate()) {
+      <label for="task-start">Starting</label>
+      <input id="task-start" type="date" formControlName="startsOn" />
+      @if (frequency() === 'QUARTERLY') {
+        <p class="hint">Repeats on this day of the month (the last day if it's after the 28th).</p>
+      }
+      @if (attempted() && !form.controls.startsOn.value) {
+        <p class="field-error">Choose a start date.</p>
+      }
+    }
+
+    <label for="task-minutes">Estimated minutes <span class="optional">(optional)</span></label>
+    <input id="task-minutes" type="number" formControlName="estimatedMinutes" min="1" max="1440" />
+    @if (attempted() && form.controls.estimatedMinutes.invalid) {
+      <p class="field-error">Enter 1 to 1440 minutes, or leave it empty.</p>
+    }
+
+    @if (error()) {
+      <p class="form-error" role="alert">{{ error() }}</p>
+    }
+
+    <button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save task' }}</button>
+  </form>
+  <p><a routerLink="/">Cancel</a></p>
+}

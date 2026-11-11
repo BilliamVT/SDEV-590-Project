@@ -103,6 +103,12 @@ public class HouseholdService {
 		return response(household);
 	}
 
+	/** The logged-in user's household, for code that stores data in it (decision record 0005). */
+	@Transactional(readOnly = true)
+	public Household householdOf(long userId) {
+		return householdOf(user(userId));
+	}
+
 	private AppUser user(long userId) {
 		// CurrentUserJwtConverter has already checked that this user exists
 		return users.findById(userId).orElseThrow();

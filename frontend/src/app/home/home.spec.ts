@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { NEVER, Observable, of, throwError } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
@@ -12,6 +13,7 @@ describe('Home', () => {
     await TestBed.configureTestingModule({
       imports: [Home],
       providers: [
+        provideRouter([]),
         { provide: HealthService, useValue: { status: () => status } },
         { provide: HouseholdService, useValue: { load: () => NEVER } },
         { provide: AuthService, useValue: { user: signal({ id: 2, email: 'bill@example.com', displayName: 'Bill' }) } },
@@ -21,6 +23,11 @@ describe('Home', () => {
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
   }
+
+  it('links to adding a task', async () => {
+    const element = await render(NEVER);
+    expect(element.querySelector('a[href="/tasks/new"]')?.textContent).toBe('Add a task');
+  });
 
   it('welcomes the signed-in user', async () => {
     const element = await render(NEVER);

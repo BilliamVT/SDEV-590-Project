@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
 import { HealthService } from '../health/health.service';
@@ -8,7 +9,7 @@ type ServerState = 'checking' | 'up' | 'down' | 'unreachable';
 
 @Component({
   selector: 'app-home',
-  imports: [HouseholdCard],
+  imports: [HouseholdCard, RouterLink],
   templateUrl: './home.html',
   styleUrl: './home.scss',
 })
