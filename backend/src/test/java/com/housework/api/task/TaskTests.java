@@ -2,8 +2,11 @@ package com.housework.api.task;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
+import java.util.List;
 
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
@@ -64,6 +67,41 @@ class TaskTests {
 		assertThat(everyTenDays).hasStatus(201);
 		assertThat(text(everyTenDays, "$.startsOn")).isEqualTo(start);
 		assertThat(text(everyTenDays, "$.schedule")).isEqualTo("Every 10 days");
+	}
+
+	@Test
+	void everyNWeeksStartsOnTheFirstChosenWeekdayOnOrAfterTheStartDate() {
+		String token = registerWithHousehold("pat@example.com", "America/New_York");
+		LocalDate start = LocalDate.now(ZoneId.of("America/New_York")).plusDays(1);
+		// One weekday later in the week than the start, and one earlier (so it falls in the next week)
+		DayOfWeek later = start.getDayOfWeek().plus(2);
+		DayOfWeek earlier = start.getDayOfWeek().minus(2);
+
+		for (DayOfWeek day : List.of(later, earlier, start.getDayOfWeek())) {
+			MvcTestResult result = create(token, """
+					{"name": "Sheets", "frequency": "EVERY_N_WEEKS", "interval": 2, "dayOfWeek": "%s", "startsOn": "%s"}
+					""".formatted(day, start));
+
+			LocalDate expected = start.with(TemporalAdjusters.nextOrSame(day));
+			assertThat(text(result, "$.startsOn")).as(day.toString()).isEqualTo(expected.toString());
+		}
+	}
+
+	@Test
+	void theStartDateCantBeInThePast() {
+		String token = registerWithHousehold("pat@example.com", "America/New_York");
+		LocalDate today = LocalDate.now(ZoneId.of("America/New_York"));
+
+		MvcTestResult yesterday = create(token, """
+				{"name": "Water plants", "frequency": "EVERY_N_DAYS", "interval": 3, "startsOn": "%s"}
+				""".formatted(today.minusDays(1)));
+		MvcTestResult todayStart = create(token, """
+				{"name": "Water plants", "frequency": "EVERY_N_DAYS", "interval": 3, "startsOn": "%s"}
+				""".formatted(today));
+
+		assertThat(yesterday).hasStatus(400);
+		assertThat(text(yesterday, "$.detail")).isEqualTo("Choose a start date from today on.");
+		assertThat(todayStart).hasStatus(201);
 	}
 
 	@Test

@@ -45,6 +45,8 @@ export class NewTask {
     startsOn: [today()],
     estimatedMinutes: [null as number | null, [Validators.min(1), Validators.max(1440)]],
   });
+  /** The start date is the first time it's due, so it can't be earlier than today. */
+  protected readonly today = today();
   protected readonly attempted = signal(false);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -71,6 +73,47 @@ export class NewTask {
     return this.intervalLimit() !== undefined || this.frequency() === 'QUARTERLY';
   }
 
+  /**
+   * When a task with a chosen start date first happens, matching the backend: every-N-weeks
+   * tasks start on the first chosen weekday on or after the date, and quarterly tasks after the
+   * 28th use the last day of the month. Null until the inputs are valid.
+   */
+  protected preview(): string | null {
+    const value = this.form.getRawValue();
+    if (!this.needsStartDate() || this.startInvalid() || this.intervalInvalid()) {
+      return null;
+    }
+    const [year, month, day] = value.startsOn!.split('-').map(Number);
+    let first = new Date(year, month - 1, day);
+    let then: string;
+    switch (this.frequency()) {
+      case 'EVERY_N_WEEKS': {
+        const wanted = (DAYS.indexOf(value.dayOfWeek!) + 1) % 7;
+        first = new Date(year, month - 1, day + ((wanted - first.getDay() + 7) % 7));
+        then = `every ${value.interval} weeks`;
+        break;
+      }
+      case 'QUARTERLY':
+        if (day > 28) {
+          first = new Date(year, month, 0);
+          then = 'every 3 months on the last day';
+        } else {
+          then = 'every 3 months';
+        }
+        break;
+      default:
+        then = `every ${value.interval} days`;
+    }
+    const date = first.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+    return `First time: ${date}, then ${then}.`;
+  }
+
+  protected startInvalid(): boolean {
+    const startsOn = this.form.controls.startsOn.value;
+    // yyyy-mm-dd strings compare in date order
+    return this.needsStartDate() && (!startsOn || startsOn < this.today);
+  }
+
   protected intervalInvalid(): boolean {
     const limit = this.intervalLimit();
     const interval = this.form.controls.interval.value;
@@ -79,7 +122,7 @@ export class NewTask {
 
   protected submit(): void {
     this.attempted.set(true);
-    if (this.form.invalid || this.intervalInvalid() || (this.needsStartDate() && !this.form.controls.startsOn.value)) {
+    if (this.form.invalid || this.intervalInvalid() || this.startInvalid()) {
       return;
     }
     this.saving.set(true);

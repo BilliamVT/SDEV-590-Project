@@ -39,6 +39,9 @@ public class Task {
 	/** Set when deleted (BILLIAMVT-22); deleted tasks are kept so their history stays. */
 	private Instant deletedAt;
 
+	/** Occurrences exist up to this date (BILLIAMVT-38, V4); null before the first generation. */
+	private LocalDate generatedThrough;
+
 	@CreationTimestamp
 	private Instant createdAt;
 
@@ -82,6 +85,20 @@ public class Task {
 
 	public boolean isActive() {
 		return active;
+	}
+
+	/** Paused or deleted tasks get no new occurrences. */
+	public boolean isScheduled() {
+		return active && deletedAt == null;
+	}
+
+	public LocalDate getGeneratedThrough() {
+		return generatedThrough;
+	}
+
+	/** Called by schedule generation only. */
+	public void markGeneratedThrough(LocalDate date) {
+		this.generatedThrough = date;
 	}
 
 }
