@@ -146,12 +146,14 @@ async function github(repo, path) {
 
 async function fetchData(repo) {
   const runs = [];
+  // No status=completed filter: GitHub updates that filtered list late, so a just-finished
+  // deploy can be missing for a while. In-progress runs have no conclusion and drop out below.
   for (let page = 1; ; page++) {
-    const { workflow_runs } = await github(repo, `/actions/workflows/deploy.yml/runs?branch=main&status=completed&per_page=100&page=${page}`);
+    const { workflow_runs } = await github(repo, `/actions/workflows/deploy.yml/runs?branch=main&per_page=100&page=${page}`);
     runs.push(...workflow_runs);
     if (workflow_runs.length < 100) break;
   }
-  // Runs are skipped when CI failed; those aren't deploy attempts
+  // Runs are skipped when CI failed; those aren't deploy attempts. Unfinished runs drop out too
   const deployRuns = runs.filter((run) => ['success', 'failure'].includes(run.conclusion));
   for (const run of deployRuns) {
     // Jobs of the attempt that set the run's result (a re-run is a new attempt)
