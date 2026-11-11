@@ -87,6 +87,10 @@ public class Task {
 		return active;
 	}
 
+	public boolean isDeleted() {
+		return deletedAt != null;
+	}
+
 	/** Paused or deleted tasks get no new occurrences. */
 	public boolean isScheduled() {
 		return active && deletedAt == null;
@@ -94,6 +98,29 @@ public class Task {
 
 	public LocalDate getGeneratedThrough() {
 		return generatedThrough;
+	}
+
+	void rename(String name, Integer estimatedMinutes) {
+		this.name = name;
+		this.estimatedMinutes = estimatedMinutes;
+	}
+
+	void reschedule(String recurrenceRule, LocalDate startsOn) {
+		this.recurrenceRule = recurrenceRule;
+		this.startsOn = startsOn;
+	}
+
+	void pause() {
+		this.active = false;
+	}
+
+	void resume() {
+		this.active = true;
+	}
+
+	/** Soft delete: the task and its past occurrences stay, as history. */
+	void delete(Instant now) {
+		this.deletedAt = now;
 	}
 
 	/** Called by schedule generation only. */

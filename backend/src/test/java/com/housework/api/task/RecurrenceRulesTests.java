@@ -34,6 +34,23 @@ class RecurrenceRulesTests {
 		assertThat(RecurrenceRules.describe(rule)).isEqualTo(description);
 	}
 
+	@ParameterizedTest
+	@CsvSource(delimiter = '|', textBlock = """
+			DAILY         |    |          |
+			WEEKLY        |    | SATURDAY |
+			EVERY_N_DAYS  | 3  |          |
+			EVERY_N_WEEKS | 2  | MONDAY   |
+			MONTHLY       |    |          | 15
+			MONTHLY       |    |          | -1
+			QUARTERLY     |    |          |
+			""")
+	void readsARuleBackIntoItsMenuChoice(Frequency frequency, Integer interval, DayOfWeek dayOfWeek, Integer dayOfMonth) {
+		String rule = RecurrenceRules.build(frequency, interval, dayOfWeek, dayOfMonth, START);
+
+		assertThat(RecurrenceRules.parse(rule))
+			.isEqualTo(new RecurrenceRules.MenuChoice(frequency, interval, dayOfWeek, dayOfMonth));
+	}
+
 	@Test
 	void quarterlyFromALateDayUsesTheLastDayOfTheMonth() {
 		String rule = RecurrenceRules.build(Frequency.QUARTERLY, null, null, null, LocalDate.of(2026, 10, 31));

@@ -28,12 +28,24 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 			  and status = 'PENDING' and scheduled_date = original_date""", nativeQuery = true)
 	int deleteReplaceable(@Param("taskId") long taskId, @Param("from") LocalDate from);
 
-	/** A household's occurrences in a date range, by date and then task name (decision record 0005). */
+	/** Every future occurrence still pending, moved or not; removed when a task is deleted. */
+	@Modifying
+	@Query(value = """
+			delete from occurrence
+			where task_id = :taskId and status = 'PENDING'
+			  and (original_date >= :from or scheduled_date >= :from)""", nativeQuery = true)
+	int deleteUpcoming(@Param("taskId") long taskId, @Param("from") LocalDate from);
+
+	/**
+	 * A household's occurrences in a date range, by date and then task name (decision record 0005).
+	 * Deleted tasks' occurrences are included: they're history (BILLIAMVT-22).
+	 */
 	@Query("""
 			select new com.housework.api.schedule.ScheduleDtos$ScheduledOccurrence(
-			    o.id, t.id, t.name, o.scheduledDate, o.originalDate, o.status, t.estimatedMinutes)
+			    o.id, t.id, t.name, o.scheduledDate, o.originalDate, o.status, t.estimatedMinutes,
+			    case when t.deletedAt is null then false else true end)
 			from Occurrence o, Task t
-			where t.id = o.taskId and t.householdId = :householdId and t.deletedAt is null
+			where t.id = o.taskId and t.householdId = :householdId
 			  and o.scheduledDate between :from and :to
 			order by o.scheduledDate, t.name, o.id""")
 	List<ScheduledOccurrence> findSchedule(@Param("householdId") long householdId, @Param("from") LocalDate from,

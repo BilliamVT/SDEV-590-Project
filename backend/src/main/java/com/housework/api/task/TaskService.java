@@ -1,10 +1,13 @@
 package com.housework.api.task;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -52,7 +55,96 @@ public class TaskService {
 	@Transactional
 	public TaskResponse create(long userId, CreateTaskRequest request) {
 		Household household = households.householdOf(userId);
-		LocalDate today = LocalDate.now(clock.withZone(ZoneId.of(household.getTimeZone())));
+		LocalDate today = today(household);
+		Schedule schedule = schedule(request, today);
+		Task task = tasks.save(new Task(household.getId(), request.name().strip(), schedule.rule(), schedule.startsOn(),
+				request.estimatedMinutes()));
+		log.info("User {} created task {} in household {}", userId, task.getId(), household.getId());
+		// Ready before anyone opens the schedule (BILLIAMVT-38)
+		this.schedule.generateAhead(task, today);
+		return TaskResponse.from(task);
+	}
+
+	/** The household's tasks by name, paused ones included; deleted ones aren't (BILLIAMVT-22). */
+	@Transactional(readOnly = true)
+	public List<TaskResponse> list(long userId) {
+		Household household = households.householdOf(userId);
+		return tasks.findAllByHouseholdIdAndDeletedAtIsNullOrderByNameAscIdAsc(household.getId())
+			.stream()
+			.map(TaskResponse::from)
+			.toList();
+	}
+
+	@Transactional(readOnly = true)
+	public TaskResponse get(long userId, long taskId) {
+		return TaskResponse.from(task(households.householdOf(userId), taskId));
+	}
+
+	/**
+	 * Edits a task. A changed schedule applies from today: future occurrences that are still
+	 * pending and unmoved are replaced; past, done, skipped and moved ones are kept.
+	 */
+	@Transactional
+	public TaskResponse update(long userId, long taskId, CreateTaskRequest request) {
+		Household household = households.householdOf(userId);
+		Task task = task(household, taskId);
+		LocalDate today = today(household);
+		task.rename(request.name().strip(), request.estimatedMinutes());
+		if (scheduleChanged(task, request)) {
+			Schedule schedule = schedule(request, today);
+			task.reschedule(schedule.rule(), schedule.startsOn());
+			this.schedule.regenerate(task, today);
+		}
+		log.info("User {} edited task {}", userId, task.getId());
+		return TaskResponse.from(task);
+	}
+
+	/** Paused tasks get no new occurrences; their future pending ones are removed. */
+	@Transactional
+	public TaskResponse pause(long userId, long taskId) {
+		Household household = households.householdOf(userId);
+		Task task = task(household, taskId);
+		task.pause();
+		schedule.regenerate(task, today(household));
+		log.info("User {} paused task {}", userId, task.getId());
+		return TaskResponse.from(task);
+	}
+
+	/** Back on its original rule and start date, from today on; the paused days aren't filled in. */
+	@Transactional
+	public TaskResponse resume(long userId, long taskId) {
+		Household household = households.householdOf(userId);
+		Task task = task(household, taskId);
+		task.resume();
+		schedule.resume(task, today(household));
+		log.info("User {} resumed task {}", userId, task.getId());
+		return TaskResponse.from(task);
+	}
+
+	/** Soft delete: past occurrences stay as history; upcoming pending ones are removed. */
+	@Transactional
+	public void delete(long userId, long taskId) {
+		Household household = households.householdOf(userId);
+		Task task = task(household, taskId);
+		task.delete(Instant.now(clock));
+		schedule.removeUpcoming(task, today(household));
+		log.info("User {} deleted task {}", userId, task.getId());
+	}
+
+	private Task task(Household household, long taskId) {
+		return tasks.findByIdAndHouseholdIdAndDeletedAtIsNull(taskId, household.getId())
+			.orElseThrow(TaskNotFoundException::new);
+	}
+
+	private LocalDate today(Household household) {
+		return LocalDate.now(clock.withZone(ZoneId.of(household.getTimeZone())));
+	}
+
+	private record Schedule(String rule, LocalDate startsOn) {
+	}
+
+	/** The rule and start date for the form's schedule fields; checks a chosen start date. */
+	private static Schedule schedule(CreateTaskRequest request, LocalDate today) {
 		LocalDate startsOn = startsOn(request, today);
 		String rule = RecurrenceRules.build(request.frequency(), request.interval(), request.dayOfWeek(),
 				request.dayOfMonth(), startsOn);
@@ -62,12 +154,21 @@ public class TaskService {
 			// Sunday" chosen on a Wednesday would first fall 11 days later instead of 4.
 			startsOn = startsOn.with(TemporalAdjusters.nextOrSame(request.dayOfWeek()));
 		}
-		Task task = tasks.save(
-				new Task(household.getId(), request.name().strip(), rule, startsOn, request.estimatedMinutes()));
-		log.info("User {} created task {} in household {}", userId, task.getId(), household.getId());
-		// Ready before anyone opens the schedule (BILLIAMVT-38)
-		schedule.generateAhead(task, today);
-		return TaskResponse.from(task);
+		return new Schedule(rule, startsOn);
+	}
+
+	/**
+	 * Whether an edit changes the schedule. The form sends the task's current fields back, so an
+	 * unchanged schedule (even one that started in the past) is left alone.
+	 */
+	private static boolean scheduleChanged(Task task, CreateTaskRequest request) {
+		RecurrenceRules.MenuChoice current = RecurrenceRules.parse(task.getRecurrenceRule());
+		boolean chosenStart = CHOSEN_START.contains(request.frequency());
+		return current.frequency() != request.frequency()
+				|| (current.interval() != null && !current.interval().equals(request.interval()))
+				|| (current.dayOfWeek() != null && current.dayOfWeek() != request.dayOfWeek())
+				|| (current.dayOfMonth() != null && !current.dayOfMonth().equals(request.dayOfMonth()))
+				|| (chosenStart && !Objects.equals(request.startsOn(), task.getStartsOn()));
 	}
 
 	private static LocalDate startsOn(CreateTaskRequest request, LocalDate today) {

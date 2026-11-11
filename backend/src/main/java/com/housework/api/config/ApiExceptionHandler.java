@@ -31,6 +31,7 @@ import com.housework.api.household.InviteCodeNotFoundException;
 import com.housework.api.household.NoHouseholdException;
 import com.housework.api.schedule.InvalidRangeException;
 import com.housework.api.task.InvalidScheduleException;
+import com.housework.api.task.TaskNotFoundException;
 
 /**
  * Turns exceptions into RFC 9457 problem responses: application exceptions here, and Spring's
@@ -79,6 +80,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidScheduleException.class)
 	ProblemDetail invalidSchedule(InvalidScheduleException ex, HttpServletRequest request) {
 		return problem(request, HttpStatus.BAD_REQUEST, ex, "invalid schedule");
+	}
+
+	@ExceptionHandler(TaskNotFoundException.class)
+	ProblemDetail taskNotFound(TaskNotFoundException ex, HttpServletRequest request) {
+		return problem(request, HttpStatus.NOT_FOUND, ex, "task not found");
 	}
 
 	@ExceptionHandler(InvalidRangeException.class)

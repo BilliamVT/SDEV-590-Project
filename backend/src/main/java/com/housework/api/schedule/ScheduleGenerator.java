@@ -74,6 +74,25 @@ public class ScheduleGenerator {
 		generateAhead(task, today);
 	}
 
+	/**
+	 * After a task is resumed (BILLIAMVT-22): generates from today on, following the task's rule
+	 * and original start date. The paused days aren't filled in, so they don't show as overdue.
+	 */
+	@Transactional
+	public void resume(Task task, LocalDate today) {
+		if (task.getGeneratedThrough() == null || task.getGeneratedThrough().isBefore(today.minusDays(1))) {
+			task.markGeneratedThrough(today.minusDays(1));
+		}
+		generateAhead(task, today);
+	}
+
+	/** After a task is deleted: removes its pending occurrences from today on, moved ones too. */
+	@Transactional
+	public void removeUpcoming(Task task, LocalDate today) {
+		int removed = occurrences.deleteUpcoming(task.getId(), today);
+		log.info("Removed {} upcoming occurrences of deleted task {}", removed, task.getId());
+	}
+
 	LocalDate aheadOf(LocalDate today) {
 		return today.plusWeeks(properties.weeksAhead());
 	}
