@@ -50,12 +50,12 @@
 
     @if (needsStartDate()) {
       <label for="task-start">Starting</label>
-      <input id="task-start" type="date" formControlName="startsOn" />
-      @if (frequency() === 'QUARTERLY') {
-        <p class="hint">Repeats on this day of the month (the last day if it's after the 28th).</p>
+      <input id="task-start" type="date" formControlName="startsOn" [min]="today" />
+      @if (preview(); as text) {
+        <p class="preview" aria-live="polite">{{ text }}</p>
       }
-      @if (attempted() && !form.controls.startsOn.value) {
-        <p class="field-error">Choose a start date.</p>
+      @if (attempted() && startInvalid()) {
+        <p class="field-error">Choose a start date from today on.</p>
       }
     }
 

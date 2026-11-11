@@ -4,6 +4,7 @@ import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -14,6 +15,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -27,6 +29,7 @@ import com.housework.api.household.AlreadyInHouseholdException;
 import com.housework.api.household.InvalidTimeZoneException;
 import com.housework.api.household.InviteCodeNotFoundException;
 import com.housework.api.household.NoHouseholdException;
+import com.housework.api.schedule.InvalidRangeException;
 import com.housework.api.task.InvalidScheduleException;
 
 /**
@@ -78,6 +81,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 		return problem(request, HttpStatus.BAD_REQUEST, ex, "invalid schedule");
 	}
 
+	@ExceptionHandler(InvalidRangeException.class)
+	ProblemDetail invalidRange(InvalidRangeException ex, HttpServletRequest request) {
+		return problem(request, HttpStatus.BAD_REQUEST, ex, "invalid range");
+	}
+
 	/** Spring's own exceptions; the response body is unchanged, only the reason is added. */
 	@Override
 	protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
@@ -99,6 +107,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 			case HttpMessageNotReadableException unreadable -> "unreadable request body";
 			case NoResourceFoundException missing -> "no such endpoint";
 			case HttpRequestMethodNotSupportedException method -> "method not allowed";
+			case MissingServletRequestParameterException missing -> "missing parameter: " + missing.getParameterName();
+			case TypeMismatchException mismatch -> "invalid parameter: " + mismatch.getPropertyName();
 			default -> ex.getClass().getSimpleName();
 		};
 	}

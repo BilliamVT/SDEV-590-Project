@@ -18,6 +18,13 @@ const savedTask = (request: CreateTaskRequest): Task => ({
 });
 
 describe('NewTask', () => {
+  // A fixed "today" (Wednesday Nov 4, 2026), so start dates and previews don't depend on when tests run
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 4, 12));
+  });
+  afterEach(() => vi.useRealTimers());
+
   async function render(create: (request: CreateTaskRequest) => Observable<Task> = (r) => of(savedTask(r))) {
     const tasks = { create: vi.fn(create) };
     await TestBed.configureTestingModule({
@@ -79,6 +86,55 @@ describe('NewTask', () => {
     await submit();
 
     expect(tasks.create).toHaveBeenCalledWith({ name: 'Water plants', frequency: 'EVERY_N_DAYS', interval: 10, startsOn: '2026-11-07' });
+  });
+
+  it('previews when a task with a start date first happens', async () => {
+    const { element, set } = await render();
+    const preview = () => element.querySelector('.preview')?.textContent;
+
+    // Wednesday Nov 4, 2026, every 2 weeks on Sunday: this coming Sunday
+    await set('task-frequency', 'EVERY_N_WEEKS');
+    await set('task-day', 'SUNDAY');
+    await set('task-start', '2026-11-04');
+    expect(preview()).toBe('First time: Sunday, Nov 8, 2026, then every 2 weeks.');
+
+    // Starting a week and a half later moves the first time with it
+    await set('task-start', '2026-11-13');
+    expect(preview()).toBe('First time: Sunday, Nov 15, 2026, then every 2 weeks.');
+
+    await set('task-frequency', 'EVERY_N_DAYS');
+    await set('task-interval', '10');
+    expect(preview()).toBe('First time: Friday, Nov 13, 2026, then every 10 days.');
+
+    await set('task-frequency', 'QUARTERLY');
+    await set('task-start', '2026-12-31');
+    expect(preview()).toBe('First time: Thursday, Dec 31, 2026, then every 3 months on the last day.');
+    await set('task-start', '2026-11-15');
+    expect(preview()).toBe('First time: Sunday, Nov 15, 2026, then every 3 months.');
+  });
+
+  it("doesn't allow a start date in the past", async () => {
+    const { tasks, element, set, submit } = await render();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    await set('task-name', 'Water plants');
+    await set('task-frequency', 'EVERY_N_DAYS');
+    expect(element.querySelector<HTMLInputElement>('#task-start')?.min).toBe(iso(new Date()));
+    await set('task-start', iso(yesterday));
+    await submit();
+
+    expect(tasks.create).not.toHaveBeenCalled();
+    expect(element.textContent).toContain('Choose a start date from today on.');
+    expect(element.querySelector('.preview')).toBeNull();
+  });
+
+  it('hides the preview until the interval is valid', async () => {
+    const { element, set } = await render();
+    await set('task-frequency', 'EVERY_N_DAYS');
+    await set('task-interval', '1');
+    expect(element.querySelector('.preview')).toBeNull();
   });
 
   it('offers days 1 to 28 and the last day for monthly tasks', async () => {
