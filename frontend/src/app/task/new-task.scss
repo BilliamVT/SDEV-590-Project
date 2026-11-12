@@ -28,6 +28,39 @@ button[type='submit'] {
   font-size: 1rem;
 }
 
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: none;
+
+  legend {
+    margin-bottom: 0.25rem;
+    padding: 0;
+    font-weight: 600;
+  }
+}
+
+// One toggle per day; 44px is Apple's minimum touch target
+.day {
+  width: 44px;
+  height: 44px;
+  font-size: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text);
+
+  &[aria-pressed='true'] {
+    border-color: var(--color-link);
+    background: var(--color-link);
+    color: var(--color-background);
+    font-weight: 600;
+  }
+}
+
 .optional,
 .hint {
   color: var(--color-text-muted);

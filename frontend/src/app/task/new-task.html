@@ -27,12 +27,23 @@
   }
 
   @if (needsDay()) {
-    <label for="task-day">On</label>
-    <select id="task-day" formControlName="dayOfWeek">
+    <fieldset id="task-day" class="days">
+      <legend>On</legend>
       @for (day of days; track day.value) {
-        <option [value]="day.value">{{ day.label }}</option>
+        <button
+          type="button"
+          class="day"
+          [attr.aria-label]="day.name"
+          [attr.aria-pressed]="isChosen(day.value)"
+          (click)="toggleDay(day.value)"
+        >
+          {{ day.letter }}
+        </button>
       }
-    </select>
+    </fieldset>
+    @if (attempted() && daysInvalid()) {
+      <p class="field-error">Choose at least one day.</p>
+    }
   }
 
   @if (frequency() === 'MONTHLY') {

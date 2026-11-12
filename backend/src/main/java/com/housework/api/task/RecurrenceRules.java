@@ -3,9 +3,14 @@ package com.housework.api.task;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import net.fortuna.ical4j.model.Recur;
 
@@ -27,21 +32,31 @@ final class RecurrenceRules {
 
 	static final int LAST_DAY_OF_MONTH = -1;
 
+	/** Sunday first, like the week view. */
+	private static final Comparator<DayOfWeek> SUNDAY_FIRST = Comparator.comparingInt(day -> day.getValue() % 7);
+
 	private RecurrenceRules() {
+	}
+
+	/** The chosen days without duplicates, Sunday first; null if none were chosen. */
+	static List<DayOfWeek> sorted(Collection<DayOfWeek> days) {
+		return days == null || days.isEmpty() ? null : days.stream().distinct().sorted(SUNDAY_FIRST).toList();
 	}
 
 	/**
 	 * The rule for a schedule. {@code startsOn} is only used for quarterly rules, which repeat
 	 * on its day of the month (the last day if it's after the 28th).
 	 */
-	static String build(Frequency frequency, Integer interval, DayOfWeek dayOfWeek, Integer dayOfMonth,
+	static String build(Frequency frequency, Integer interval, Collection<DayOfWeek> daysOfWeek, Integer dayOfMonth,
 			LocalDate startsOn) {
 		String rule = switch (frequency) {
 			case DAILY -> "FREQ=DAILY";
-			case WEEKLY -> "FREQ=WEEKLY;BYDAY=" + byDay(required(dayOfWeek, "Choose a day of the week."));
+			case WEEKLY -> "FREQ=WEEKLY;BYDAY=" + byDays(daysOfWeek);
 			case EVERY_N_DAYS -> "FREQ=DAILY;INTERVAL=" + interval(interval, MAX_INTERVAL_DAYS, "days");
+			// WKST=SU: weeks run Sunday to Saturday like the week view. Without it, ical4j uses the
+			// server's locale, which would change which days share a week (BILLIAMVT-50).
 			case EVERY_N_WEEKS -> "FREQ=WEEKLY;INTERVAL=" + interval(interval, MAX_INTERVAL_WEEKS, "weeks")
-					+ ";BYDAY=" + byDay(required(dayOfWeek, "Choose a day of the week."));
+					+ ";WKST=SU;BYDAY=" + byDays(daysOfWeek);
 			case MONTHLY -> "FREQ=MONTHLY;BYMONTHDAY=" + dayOfMonth(dayOfMonth);
 			case QUARTERLY -> "FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY="
 					+ (startsOn.getDayOfMonth() > MAX_DAY_OF_MONTH ? LAST_DAY_OF_MONTH : startsOn.getDayOfMonth());
@@ -56,31 +71,31 @@ final class RecurrenceRules {
 	}
 
 	/** The menu fields a rule was built from, to fill in the edit form (BILLIAMVT-22). */
-	record MenuChoice(Frequency frequency, Integer interval, DayOfWeek dayOfWeek, Integer dayOfMonth) {
+	record MenuChoice(Frequency frequency, Integer interval, List<DayOfWeek> daysOfWeek, Integer dayOfMonth) {
 	}
 
 	/** Reads a rule from {@link #build} back into its menu fields. */
 	static MenuChoice parse(String rule) {
 		Map<String, String> parts = parts(rule);
 		Integer interval = parts.containsKey("INTERVAL") ? Integer.valueOf(parts.get("INTERVAL")) : null;
-		DayOfWeek day = parts.containsKey("BYDAY") ? dayOf(parts.get("BYDAY")) : null;
+		List<DayOfWeek> days = parts.containsKey("BYDAY") ? daysOf(parts.get("BYDAY")) : null;
 		Integer dayOfMonth = parts.containsKey("BYMONTHDAY") ? Integer.valueOf(parts.get("BYMONTHDAY")) : null;
 		return switch (parts.get("FREQ")) {
 			case "DAILY" -> interval == null ? new MenuChoice(Frequency.DAILY, null, null, null)
 					: new MenuChoice(Frequency.EVERY_N_DAYS, interval, null, null);
-			case "WEEKLY" -> interval == null ? new MenuChoice(Frequency.WEEKLY, null, day, null)
-					: new MenuChoice(Frequency.EVERY_N_WEEKS, interval, day, null);
+			case "WEEKLY" -> interval == null ? new MenuChoice(Frequency.WEEKLY, null, days, null)
+					: new MenuChoice(Frequency.EVERY_N_WEEKS, interval, days, null);
 			case "MONTHLY" -> interval == null ? new MenuChoice(Frequency.MONTHLY, null, null, dayOfMonth)
 					: new MenuChoice(Frequency.QUARTERLY, null, null, null);
 			default -> throw new IllegalArgumentException("Not a rule from the task menu: " + rule);
 		};
 	}
 
-	/** A rule from {@link #build} in words, e.g. "Every 2 weeks on Saturday". */
+	/** A rule from {@link #build} in words, e.g. "Every 2 weeks on Saturday" or "Every week on Monday and Thursday". */
 	static String describe(String rule) {
 		Map<String, String> parts = parts(rule);
 		int interval = Integer.parseInt(parts.getOrDefault("INTERVAL", "1"));
-		String day = parts.containsKey("BYDAY") ? " on " + dayName(parts.get("BYDAY")) : "";
+		String day = parts.containsKey("BYDAY") ? " on " + dayNames(daysOf(parts.get("BYDAY"))) : "";
 		return switch (parts.get("FREQ")) {
 			case "DAILY" -> interval == 1 ? "Every day" : "Every " + interval + " days";
 			case "WEEKLY" -> (interval == 1 ? "Every week" : "Every " + interval + " weeks") + day;
@@ -99,11 +114,13 @@ final class RecurrenceRules {
 		return parts;
 	}
 
-	private static <T> T required(T value, String message) {
-		if (value == null) {
-			throw new InvalidScheduleException(message);
+	/** MONDAY, THURSDAY → MO,TH (Sunday first) */
+	private static String byDays(Collection<DayOfWeek> days) {
+		List<DayOfWeek> sorted = sorted(days);
+		if (sorted == null) {
+			throw new InvalidScheduleException("Choose at least one day of the week.");
 		}
-		return value;
+		return sorted.stream().map(RecurrenceRules::byDay).collect(Collectors.joining(","));
 	}
 
 	private static int interval(Integer interval, int max, String unit) {
@@ -126,9 +143,21 @@ final class RecurrenceRules {
 		return day.name().substring(0, 2);
 	}
 
-	/** SA → Saturday */
-	private static String dayName(String byDay) {
-		return dayOf(byDay).getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+	/** MO,TH → [MONDAY, THURSDAY] */
+	private static List<DayOfWeek> daysOf(String byDay) {
+		return sorted(Arrays.stream(byDay.split(",")).map(RecurrenceRules::dayOf).toList());
+	}
+
+	/** Saturday; Monday and Thursday; Sun, Mon, Wed (three or more are shortened) */
+	private static String dayNames(List<DayOfWeek> days) {
+		if (days.size() == 1) {
+			return days.getFirst().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+		}
+		if (days.size() == 2) {
+			return days.get(0).getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " and "
+					+ days.get(1).getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+		}
+		return days.stream().map(day -> day.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)).collect(Collectors.joining(", "));
 	}
 
 	/** SA → SATURDAY */

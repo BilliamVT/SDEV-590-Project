@@ -8,7 +8,8 @@ export interface CreateTaskRequest {
   name: string;
   frequency: Frequency;
   interval?: number;
-  dayOfWeek?: DayOfWeek;
+  /** WEEKLY and EVERY_N_WEEKS: one or more days (BILLIAMVT-50) */
+  daysOfWeek?: DayOfWeek[];
   /** 1–28, or -1 for the last day of the month */
   dayOfMonth?: number;
   /** yyyy-mm-dd */
@@ -20,12 +21,13 @@ export interface Task {
   id: number;
   name: string;
   recurrenceRule: string;
-  /** In words, e.g. "Every week on Saturday" */
+  /** In words, e.g. "Every week on Saturday" or "Every week on Monday and Thursday" */
   schedule: string;
   /** The menu fields the rule was built from, for the edit form */
   frequency: Frequency;
   interval: number | null;
-  dayOfWeek: DayOfWeek | null;
+  /** Sunday first */
+  daysOfWeek: DayOfWeek[] | null;
   dayOfMonth: number | null;
   startsOn: string;
   estimatedMinutes: number | null;

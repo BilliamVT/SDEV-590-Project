@@ -40,7 +40,7 @@ class TaskTests {
 		String token = registerWithHousehold("pat@example.com", "Pacific/Auckland");
 
 		MvcTestResult result = create(token, """
-				{"name": "  Vacuum  ", "frequency": "WEEKLY", "dayOfWeek": "SATURDAY", "estimatedMinutes": 30}
+				{"name": "  Vacuum  ", "frequency": "WEEKLY", "daysOfWeek": ["SATURDAY"], "estimatedMinutes": 30}
 				""");
 
 		assertThat(result).hasStatus(201);
@@ -53,6 +53,24 @@ class TaskTests {
 		assertThat(task.getHouseholdId()).isEqualTo(users.findByEmail("pat@example.com").orElseThrow().getHouseholdId());
 		assertThat(task.getEstimatedMinutes()).isEqualTo(30);
 		assertThat(task.isActive()).isTrue();
+	}
+
+	@Test
+	void aTaskCanRepeatOnSeveralDaysOfTheWeek() {
+		String token = registerWithHousehold("pat@example.com", "America/New_York");
+
+		MvcTestResult result = create(token, """
+				{"name": "Litter box", "frequency": "WEEKLY", "daysOfWeek": ["MONDAY", "SUNDAY", "FRIDAY", "WEDNESDAY", "THURSDAY", "MONDAY"]}
+				""");
+
+		assertThat(result).hasStatus(201);
+		assertThat(text(result, "$.recurrenceRule")).isEqualTo("FREQ=WEEKLY;BYDAY=SU,MO,WE,TH,FR");
+		assertThat(text(result, "$.schedule")).isEqualTo("Every week on Sun, Mon, Wed, Thu, Fri");
+		assertThat(JsonPath.<List<String>>read(body(result), "$.daysOfWeek"))
+			.containsExactly("SUNDAY", "MONDAY", "WEDNESDAY", "THURSDAY", "FRIDAY");
+		assertThat(create(token, """
+				{"name": "Laundry", "frequency": "WEEKLY", "daysOfWeek": []}
+				""")).hasStatus(400);
 	}
 
 	@Test
@@ -79,7 +97,7 @@ class TaskTests {
 
 		for (DayOfWeek day : List.of(later, earlier, start.getDayOfWeek())) {
 			MvcTestResult result = create(token, """
-					{"name": "Sheets", "frequency": "EVERY_N_WEEKS", "interval": 2, "dayOfWeek": "%s", "startsOn": "%s"}
+					{"name": "Sheets", "frequency": "EVERY_N_WEEKS", "interval": 2, "daysOfWeek": ["%s"], "startsOn": "%s"}
 					""".formatted(day, start));
 
 			LocalDate expected = start.with(TemporalAdjusters.nextOrSame(day));
@@ -123,11 +141,11 @@ class TaskTests {
 				{"name": "Vacuum", "frequency": "WEEKLY"}
 				""");
 		MvcTestResult farStart = create(token, """
-				{"name": "Gutters", "frequency": "EVERY_N_WEEKS", "interval": 26, "dayOfWeek": "SATURDAY", "startsOn": "2030-01-01"}
+				{"name": "Gutters", "frequency": "EVERY_N_WEEKS", "interval": 26, "daysOfWeek": ["SATURDAY"], "startsOn": "2030-01-01"}
 				""");
 
 		assertThat(noDay).hasStatus(400);
-		assertThat(text(noDay, "$.detail")).isEqualTo("Choose a day of the week.");
+		assertThat(text(noDay, "$.detail")).isEqualTo("Choose at least one day of the week.");
 		assertThat(text(farStart, "$.detail")).isEqualTo("Choose a start date within a year of today.");
 		assertThat(tasks.count()).isZero();
 	}

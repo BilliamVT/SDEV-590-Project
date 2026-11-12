@@ -14,7 +14,7 @@ const savedTask = (request: CreateTaskRequest): Task => ({
   schedule: 'Every week on Saturday',
   frequency: request.frequency,
   interval: request.interval ?? null,
-  dayOfWeek: request.dayOfWeek ?? null,
+  daysOfWeek: request.daysOfWeek ?? null,
   dayOfMonth: request.dayOfMonth ?? null,
   startsOn: '2026-11-04',
   estimatedMinutes: request.estimatedMinutes ?? null,
@@ -54,18 +54,23 @@ describe('NewTask', () => {
       [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!.click();
       await fixture.whenStable();
     };
-    return { tasks, router, element, set, submit, click };
+    /** Taps a day toggle by its full name, e.g. 'Saturday' */
+    const toggle = async (day: string) => {
+      element.querySelector<HTMLButtonElement>(`#task-day button[aria-label="${day}"]`)!.click();
+      await fixture.whenStable();
+    };
+    return { tasks, router, element, set, submit, click, toggle };
   }
 
   it('creates a weekly task with only the fields it needs, then shows the week', async () => {
-    const { tasks, router, set, submit } = await render();
+    const { tasks, router, set, submit, toggle } = await render();
     await set('task-name', '  Vacuum  ');
     await set('task-frequency', 'WEEKLY');
-    await set('task-day', 'SATURDAY');
+    await toggle('Saturday');
     await set('task-minutes', '30');
     await submit();
 
-    expect(tasks.create).toHaveBeenCalledWith({ name: 'Vacuum', frequency: 'WEEKLY', dayOfWeek: 'SATURDAY', estimatedMinutes: 30 });
+    expect(tasks.create).toHaveBeenCalledWith({ name: 'Vacuum', frequency: 'WEEKLY', daysOfWeek: ['SATURDAY'], estimatedMinutes: 30 });
     expect(router.navigate).toHaveBeenCalledWith(['/'], {
       state: { savedTask: { name: 'Vacuum', schedule: 'every week on Saturday' } },
     });
@@ -97,12 +102,12 @@ describe('NewTask', () => {
   });
 
   it('previews when a task with a start date first happens', async () => {
-    const { element, set } = await render();
+    const { element, set, toggle } = await render();
     const preview = () => element.querySelector('.preview')?.textContent;
 
     // Wednesday Nov 4, 2026, every 2 weeks on Sunday: this coming Sunday
     await set('task-frequency', 'EVERY_N_WEEKS');
-    await set('task-day', 'SUNDAY');
+    await toggle('Sunday');
     await set('task-start', '2026-11-04');
     expect(preview()).toBe('First time: Sunday, Nov 8, 2026, then every 2 weeks.');
 
@@ -178,5 +183,48 @@ describe('NewTask', () => {
     await submit();
 
     expect(element.textContent).toContain('Choose a start date within a year of today.');
+  });
+
+  describe('several days a week (BILLIAMVT-50)', () => {
+    it('sends the chosen days Sunday first, and untaps a day', async () => {
+      const { tasks, element, set, submit, toggle } = await render();
+      await set('task-name', 'Litter box');
+      await set('task-frequency', 'WEEKLY');
+      for (const day of ['Monday', 'Friday', 'Sunday', 'Tuesday', 'Wednesday', 'Thursday']) {
+        await toggle(day);
+      }
+      await toggle('Tuesday');
+
+      const pressed = [...element.querySelectorAll('#task-day button')].map((b) => b.getAttribute('aria-pressed'));
+      expect(pressed).toEqual(['true', 'true', 'false', 'true', 'true', 'true', 'false']);
+      await submit();
+
+      expect(tasks.create).toHaveBeenCalledWith({
+        name: 'Litter box',
+        frequency: 'WEEKLY',
+        daysOfWeek: ['SUNDAY', 'MONDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
+      });
+    });
+
+    it('needs at least one day', async () => {
+      const { tasks, element, set, submit } = await render();
+      await set('task-name', 'Laundry');
+      await set('task-frequency', 'WEEKLY');
+      await submit();
+
+      expect(tasks.create).not.toHaveBeenCalled();
+      expect(element.querySelector('.field-error')?.textContent).toBe('Choose at least one day.');
+    });
+
+    it('previews the earliest chosen day on or after the start', async () => {
+      const { element, set, toggle } = await render();
+      // Wednesday Nov 4: Monday is already past this week, so Thursday Nov 5 comes first
+      await set('task-frequency', 'EVERY_N_WEEKS');
+      await toggle('Monday');
+      await toggle('Thursday');
+      await set('task-start', '2026-11-04');
+
+      expect(element.querySelector('.preview')?.textContent).toBe('First time: Thursday, Nov 5, 2026, then every 2 weeks.');
+    });
   });
 });

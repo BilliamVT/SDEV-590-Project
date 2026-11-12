@@ -44,7 +44,7 @@ class TaskManagementTests {
 	@Test
 	void listsTheHouseholdsTasksByNameWithPausedOnesMarked() {
 		String token = registerWithHousehold("pat@example.com");
-		createTask(token, "{\"name\": \"Vacuum\", \"frequency\": \"WEEKLY\", \"dayOfWeek\": \"SATURDAY\"}");
+		createTask(token, "{\"name\": \"Vacuum\", \"frequency\": \"WEEKLY\", \"daysOfWeek\": [\"SATURDAY\"]}");
 		long dishes = createTask(token, "{\"name\": \"Dishes\", \"frequency\": \"DAILY\"}");
 		long gone = createTask(token, "{\"name\": \"Gutters\", \"frequency\": \"QUARTERLY\"}");
 		send(token, "POST", "/api/tasks/" + dishes + "/pause");
@@ -61,14 +61,14 @@ class TaskManagementTests {
 	void oneTaskIncludesItsMenuFieldsForTheEditForm() {
 		String token = registerWithHousehold("pat@example.com");
 		long id = createTask(token, """
-				{"name": "Sheets", "frequency": "EVERY_N_WEEKS", "interval": 2, "dayOfWeek": "SUNDAY", "estimatedMinutes": 20}
+				{"name": "Sheets", "frequency": "EVERY_N_WEEKS", "interval": 2, "daysOfWeek": ["THURSDAY", "SUNDAY"], "estimatedMinutes": 20}
 				""");
 
 		MvcTestResult result = send(token, "GET", "/api/tasks/" + id);
 
 		assertThat(text(result, "$.frequency")).isEqualTo("EVERY_N_WEEKS");
 		assertThat(JsonPath.<Integer>read(body(result), "$.interval")).isEqualTo(2);
-		assertThat(text(result, "$.dayOfWeek")).isEqualTo("SUNDAY");
+		assertThat(JsonPath.<java.util.List<String>>read(body(result), "$.daysOfWeek")).containsExactly("SUNDAY", "THURSDAY");
 		assertThat(JsonPath.<Integer>read(body(result), "$.estimatedMinutes")).isEqualTo(20);
 	}
 
@@ -111,7 +111,7 @@ class TaskManagementTests {
 		jdbc.sql("update occurrence set status = 'DONE' where task_id = ? and original_date = ?")
 			.params(id, today.plusDays(1)).update();
 
-		update(token, id, "{\"name\": \"Dishes\", \"frequency\": \"WEEKLY\", \"dayOfWeek\": \"SUNDAY\"}");
+		update(token, id, "{\"name\": \"Dishes\", \"frequency\": \"WEEKLY\", \"daysOfWeek\": [\"SUNDAY\"]}");
 
 		List<LocalDate> dates = dates(id);
 		assertThat(dates).contains(today.minusDays(2), today.plusDays(1));
@@ -159,7 +159,7 @@ class TaskManagementTests {
 	void resumingFollowsTheTasksOwnRule() {
 		String token = registerWithHousehold("pat@example.com");
 		DayOfWeek otherDay = today.getDayOfWeek().plus(3);
-		long id = createTask(token, "{\"name\": \"Vacuum\", \"frequency\": \"WEEKLY\", \"dayOfWeek\": \"%s\"}".formatted(otherDay));
+		long id = createTask(token, "{\"name\": \"Vacuum\", \"frequency\": \"WEEKLY\", \"daysOfWeek\": [\"%s\"]}".formatted(otherDay));
 		send(token, "POST", "/api/tasks/" + id + "/pause");
 
 		send(token, "POST", "/api/tasks/" + id + "/resume");
