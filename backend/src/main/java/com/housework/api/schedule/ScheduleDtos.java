@@ -15,23 +15,24 @@ public final class ScheduleDtos {
 	/** One row of the schedule query (OccurrenceRepository.findSchedule). */
 	public record ScheduledOccurrence(Long id, Long taskId, String taskName, LocalDate date, LocalDate originalDate,
 			OccurrenceStatus status, Integer estimatedMinutes, boolean taskDeleted, String completedByName,
-			Instant completedAt) {
+			Instant completedAt, boolean oneOff) {
 	}
 
 	/**
 	 * {@code overdue}: still pending on a day before the household's today, and its task wasn't
-	 * deleted (a deleted task's missed occurrences are history, not to-dos).
+	 * deleted (a deleted task's missed occurrences are history, not to-dos). {@code oneOff}: a
+	 * backlog item's day, which can go back to the backlog when deleted (BILLIAMVT-23).
 	 */
 	public record OccurrenceResponse(Long id, Long taskId, String taskName, LocalDate date, LocalDate originalDate,
 			OccurrenceStatus status, Integer estimatedMinutes, boolean overdue, boolean taskDeleted,
-			String completedByName, Instant completedAt) {
+			String completedByName, Instant completedAt, boolean oneOff) {
 
 		static OccurrenceResponse from(ScheduledOccurrence row, LocalDate today) {
 			boolean overdue = !row.taskDeleted() && row.status() == OccurrenceStatus.PENDING
 					&& row.date().isBefore(today);
 			return new OccurrenceResponse(row.id(), row.taskId(), row.taskName(), row.date(), row.originalDate(),
 					row.status(), row.estimatedMinutes(), overdue, row.taskDeleted(), row.completedByName(),
-					row.completedAt());
+					row.completedAt(), row.oneOff());
 		}
 
 	}
