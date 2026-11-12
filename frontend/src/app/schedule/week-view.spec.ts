@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { NEVER, Observable, of, throwError } from 'rxjs';
 
+import { BacklogService } from '../backlog/backlog.service';
 import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
 import { ScheduleService } from './schedule.service';
 import { WeekView } from './week-view';
@@ -18,6 +19,7 @@ const occurrence = (id: number, taskName: string, date: string, extra: Partial<S
   taskDeleted: false,
   completedByName: null,
   completedAt: null,
+  oneOff: false,
   ...extra,
 });
 
@@ -41,11 +43,16 @@ describe('WeekView', () => {
     between: (from: string, to: string) => Observable<Schedule> = (from, to) => of(schedule(from, to)),
     changeStatus: (id: number, status: OccurrenceStatus) => Observable<ScheduledOccurrence> = () => NEVER,
     remove: (id: number) => Observable<void> = () => of(undefined),
+    deleteItem: (id: number) => Observable<void> = () => of(undefined),
   ) {
     const schedules = { between: vi.fn(between), changeStatus: vi.fn(changeStatus), delete: vi.fn(remove) };
+    const backlog = { delete: vi.fn(deleteItem) };
     await TestBed.configureTestingModule({
       imports: [WeekView],
-      providers: [{ provide: ScheduleService, useValue: schedules }],
+      providers: [
+        { provide: ScheduleService, useValue: schedules },
+        { provide: BacklogService, useValue: backlog },
+      ],
     }).compileComponents();
     const fixture = TestBed.createComponent(WeekView);
     await fixture.whenStable();
@@ -55,7 +62,7 @@ describe('WeekView', () => {
       await fixture.whenStable();
     };
     const button = (text: string) => [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!;
-    return { schedules, element, click, button, fixture };
+    return { schedules, backlog, element, click, button, fixture };
   }
 
   it('shows this week, Sunday to Saturday, with today marked', async () => {
@@ -175,6 +182,16 @@ describe('WeekView', () => {
       expect(labelOf(element)).toBe('Skipped by Pat');
     });
 
+    it('tells the page when a status changes, so the backlog can reload (BILLIAMVT-23)', async () => {
+      const { fixture, click } = await render(withVacuum, (id, status) => of({ ...vacuum, status }));
+      const changed = vi.fn();
+      fixture.componentInstance.changed.subscribe(changed);
+
+      await click('Skip');
+
+      expect(changed).toHaveBeenCalledTimes(1);
+    });
+
     it('undoes back to pending', async () => {
       const done = { ...vacuum, status: 'DONE' as const, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' };
       const { schedules, element, click } = await render(
@@ -230,6 +247,19 @@ describe('WeekView', () => {
       expect(element.querySelectorAll('.day')[3].querySelector('.empty')?.textContent).toBe('Nothing scheduled');
     });
 
+    it('tells the page after deleting, and reloads when asked (BILLIAMVT-23)', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const { schedules, fixture, click } = await render(withVacuum);
+      const changed = vi.fn();
+      fixture.componentInstance.changed.subscribe(changed);
+
+      await click('Delete');
+      expect(changed).toHaveBeenCalledTimes(1);
+
+      fixture.componentInstance.reload();
+      expect(schedules.between).toHaveBeenCalledTimes(2);
+    });
+
     it('does nothing if the user cancels', async () => {
       vi.spyOn(window, 'confirm').mockReturnValue(false);
       const { schedules, element, click } = await render(withVacuum);
@@ -249,6 +279,75 @@ describe('WeekView', () => {
       await click('Delete');
 
       expect(element.querySelector('.occurrence .item-error')?.textContent).toContain("couldn't be reached");
+    });
+  });
+
+  describe("deleting a one-off item's day (BILLIAMVT-23)", () => {
+    const shelves = occurrence(5, 'Hang shelves', '2026-11-11', { taskId: 9, oneOff: true });
+    const withShelves = (from: string, to: string) => of(schedule(from, to, [shelves]));
+    afterEach(() => vi.restoreAllMocks());
+
+    it('has Done and Remove, but no Skip: skipping would only send it back to the backlog', async () => {
+      const { button } = await render(withShelves);
+
+      expect(button('Done')).toBeDefined();
+      expect(button('Skip')).toBeUndefined();
+      expect(button('Delete')).toBeUndefined();
+      expect(button('Remove').getAttribute('aria-label')).toBe('Remove Hang shelves on Wednesday, Nov 11');
+    });
+
+    it('offers back to the backlog or for good, instead of the browser confirmation', async () => {
+      const confirm = vi.spyOn(window, 'confirm');
+      const { element, click, button } = await render(withShelves);
+
+      await click('Remove');
+
+      expect(confirm).not.toHaveBeenCalled();
+      expect(element.querySelector('.delete-choice')?.getAttribute('aria-label')).toBe('Remove Hang shelves');
+      expect(button('Back to backlog')).toBeDefined();
+      expect(button('Delete for good')).toBeDefined();
+      expect(button('Done')).toBeUndefined();
+
+      await click('Cancel');
+      expect(element.querySelector('.delete-choice')).toBeNull();
+      expect(button('Done')).toBeDefined();
+    });
+
+    it('puts it back in the backlog by deleting only the day', async () => {
+      const { schedules, backlog, element, fixture, click } = await render(withShelves);
+      const changed = vi.fn();
+      fixture.componentInstance.changed.subscribe(changed);
+
+      await click('Remove');
+      await click('Back to backlog');
+
+      expect(schedules.delete).toHaveBeenCalledWith(5);
+      expect(backlog.delete).not.toHaveBeenCalled();
+      expect(element.querySelector('.occurrence')).toBeNull();
+      expect(changed).toHaveBeenCalledTimes(1);
+    });
+
+    it('deletes the item and its days for good', async () => {
+      const { schedules, backlog, element, click } = await render(withShelves);
+
+      await click('Remove');
+      await click('Delete for good');
+
+      expect(backlog.delete).toHaveBeenCalledWith(9);
+      expect(schedules.delete).not.toHaveBeenCalled();
+      expect(element.querySelector('.occurrence')).toBeNull();
+    });
+
+    it('keeps the choice open and shows an error when it fails', async () => {
+      const { element, click } = await render(withShelves, undefined, undefined, () =>
+        throwError(() => new HttpErrorResponse({ status: 0 })),
+      );
+
+      await click('Remove');
+      await click('Delete for good');
+
+      expect(element.querySelector('.occurrence .item-error')?.textContent).toContain("couldn't be reached");
+      expect(element.querySelector('.delete-choice')).not.toBeNull();
     });
   });
 });

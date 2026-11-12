@@ -16,6 +16,8 @@ export interface ScheduledOccurrence {
   /** Who marked it done or skipped, and when (ISO instant); null while pending (BILLIAMVT-25) */
   completedByName: string | null;
   completedAt: string | null;
+  /** A backlog item's day: deleting it can put the item back in the backlog (BILLIAMVT-23). */
+  oneOff: boolean;
 }
 
 export interface Schedule {

@@ -12,7 +12,10 @@
   <a routerLink="/tasks">Your tasks</a>
 </p>
 
-<app-week-view />
+<!-- Each reloads the other: putting an item on a day, or skipping or deleting one, moves it between them -->
+<app-week-view #week (changed)="backlog.reload()" />
+
+<app-backlog #backlog (placed)="week.reload()" />
 
 <app-household-card />
 

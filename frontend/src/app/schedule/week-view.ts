@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, output, signal } from '@angular/core';
+import { Observable } from 'rxjs';
 
 import { errorMessage } from '../auth/error-message';
+import { BacklogService } from '../backlog/backlog.service';
 import { addDays, dayLabel, startOfWeek, toIsoDate, weekLabel } from './dates';
 import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
 import { ScheduleService } from './schedule.service';
@@ -21,6 +23,10 @@ interface Day {
 })
 export class WeekView {
   private readonly schedules = inject(ScheduleService);
+  private readonly backlog = inject(BacklogService);
+
+  /** A status changed or a day was deleted; a one-off item may be back in the backlog (BILLIAMVT-23). */
+  readonly changed = output<void>();
 
   private readonly thisWeek = startOfWeek(toIsoDate(new Date()));
   protected readonly weekStart = signal(this.thisWeek);
@@ -33,6 +39,8 @@ export class WeekView {
   protected readonly noHousehold = signal(false);
   /** Occurrences whose status change is on its way to the server */
   protected readonly saving = signal<ReadonlySet<number>>(new Set());
+  /** A one-off item's day whose delete choices are showing: back to the backlog, or for good */
+  protected readonly choosingDelete = signal<number | null>(null);
   /** A failed status change, shown on that occurrence */
   protected readonly itemErrors = signal<ReadonlyMap<number, string>>(new Map());
 
@@ -90,6 +98,7 @@ export class WeekView {
           schedule && { ...schedule, occurrences: schedule.occurrences.map((o) => (o.id === id ? updated : o)) },
         );
         this.saving.update((ids) => removeId(ids, id));
+        this.changed.emit();
       },
       error: (err: unknown) => {
         this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
@@ -98,27 +107,63 @@ export class WeekView {
     });
   }
 
-  /** Deletes this one day for good, after the browser's confirmation (wording to refine in BILLIAMVT-49). */
+  /**
+   * Deletes this one day for good, after the browser's confirmation (wording to refine in BILLIAMVT-49).
+   * A one-off item's day offers a choice instead: back to the backlog, or the item for good (BILLIAMVT-23).
+   */
   protected delete(occurrence: ScheduledOccurrence): void {
-    const question = `Delete "${occurrence.taskName}" on ${dayLabel(occurrence.date)} for good? This only removes this day, and it can't be undone.`;
-    if (!confirm(question)) {
+    if (occurrence.oneOff) {
+      this.choosingDelete.set(occurrence.id);
       return;
     }
+    const question = `Delete "${occurrence.taskName}" on ${dayLabel(occurrence.date)} for good? This only removes this day, and it can't be undone.`;
+    if (confirm(question)) {
+      this.remove(occurrence, this.schedules.delete(occurrence.id), (o) => o.id === occurrence.id);
+    }
+  }
+
+  /** Removes the day; the item shows in the backlog again. */
+  protected backToBacklog(occurrence: ScheduledOccurrence): void {
+    this.remove(occurrence, this.schedules.delete(occurrence.id), (o) => o.id === occurrence.id);
+  }
+
+  /** Deletes the item and all its days. */
+  protected deleteItem(occurrence: ScheduledOccurrence): void {
+    this.remove(occurrence, this.backlog.delete(occurrence.taskId), (o) => o.taskId === occurrence.taskId);
+  }
+
+  protected cancelDelete(): void {
+    this.choosingDelete.set(null);
+  }
+
+  /** Sends a delete, then takes the matching occurrences off the week. */
+  private remove(
+    occurrence: ScheduledOccurrence,
+    request: Observable<void>,
+    removed: (o: ScheduledOccurrence) => boolean,
+  ): void {
     const id = occurrence.id;
     this.saving.update((ids) => new Set(ids).add(id));
     this.itemErrors.update((errors) => removeError(errors, id));
-    this.schedules.delete(id).subscribe({
+    request.subscribe({
       next: () => {
         this.schedule.update(
-          (schedule) => schedule && { ...schedule, occurrences: schedule.occurrences.filter((o) => o.id !== id) },
+          (schedule) => schedule && { ...schedule, occurrences: schedule.occurrences.filter((o) => !removed(o)) },
         );
         this.saving.update((ids) => removeId(ids, id));
+        this.choosingDelete.set(null);
+        this.changed.emit();
       },
       error: (err: unknown) => {
         this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
         this.saving.update((ids) => removeId(ids, id));
       },
     });
+  }
+
+  /** Called after a backlog item is put on a day. */
+  reload(): void {
+    this.load();
   }
 
   private go(weekStart: string): void {

@@ -1,0 +1,102 @@
+@if (!noHousehold()) {
+  <section class="backlog" aria-labelledby="backlog-title">
+    <h2 id="backlog-title">Backlog</h2>
+    <p class="hint">One-off jobs with no set day. Put one on a day when you're ready.</p>
+
+    <form [formGroup]="form" (ngSubmit)="add()" novalidate class="add">
+      <div class="field name">
+        <label for="backlog-name">One-off item</label>
+        <input id="backlog-name" type="text" formControlName="name" placeholder="e.g. Hang shelves" autocomplete="off" />
+      </div>
+      <div class="field minutes-field">
+        <label for="backlog-minutes">Minutes <span class="optional">(optional)</span></label>
+        <input id="backlog-minutes" type="number" formControlName="estimatedMinutes" min="1" max="1440" />
+      </div>
+      <button type="submit" [disabled]="adding()">Add</button>
+    </form>
+    @if (attempted() && (form.controls.name.invalid || form.controls.name.value?.trim() === '')) {
+      <p class="field-error">Enter a name of up to 100 characters.</p>
+    }
+    @if (attempted() && form.controls.estimatedMinutes.invalid) {
+      <p class="field-error">Enter minutes from 1 to 1440.</p>
+    }
+    @if (addError()) {
+      <p class="form-error" role="alert">{{ addError() }}</p>
+    }
+
+    @if (notice()) {
+      <p class="notice" role="status">{{ notice() }}</p>
+    }
+
+    @if (error()) {
+      <p class="form-error" role="alert">{{ error() }}</p>
+    } @else if (items(); as items) {
+      @if (items.length === 0) {
+        <p class="empty">Nothing in the backlog.</p>
+      } @else {
+        <ul class="items">
+          @for (item of items; track item.id) {
+            <li class="item">
+              <div class="details">
+                <span class="name">{{ item.name }}</span>
+                @if (minutes(item); as text) {
+                  <span class="minutes">{{ text }}</span>
+                }
+              </div>
+              @if (picking()?.id === item.id) {
+                <div class="picker">
+                  <label [for]="'backlog-day-' + item.id">
+                    {{ picking()!.action === 'done' ? 'Done on' : 'Do it on' }}
+                  </label>
+                  <input
+                    [id]="'backlog-day-' + item.id"
+                    type="date"
+                    [value]="picking()!.date"
+                    [attr.min]="picking()!.action === 'schedule' ? today : null"
+                    [attr.max]="picking()!.action === 'done' ? today : null"
+                    (input)="setDate($any($event.target).value)"
+                  />
+                  <button type="button" [disabled]="saving().has(item.id)" (click)="confirm(item)">
+                    {{ picking()!.action === 'done' ? 'Mark done' : 'Add to day' }}
+                  </button>
+                  <button type="button" [disabled]="saving().has(item.id)" (click)="cancel()">Cancel</button>
+                </div>
+              } @else {
+                <div class="actions">
+                  <button
+                    type="button"
+                    [attr.aria-label]="'Mark ' + item.name + ' done'"
+                    [disabled]="saving().has(item.id)"
+                    (click)="pick(item, 'done')"
+                  >
+                    Done
+                  </button>
+                  <button
+                    type="button"
+                    [attr.aria-label]="'Schedule ' + item.name"
+                    [disabled]="saving().has(item.id)"
+                    (click)="pick(item, 'schedule')"
+                  >
+                    Schedule
+                  </button>
+                  <button
+                    type="button"
+                    class="delete"
+                    [attr.aria-label]="'Delete ' + item.name"
+                    [disabled]="saving().has(item.id)"
+                    (click)="delete(item)"
+                  >
+                    Delete
+                  </button>
+                </div>
+              }
+              @if (itemErrors().get(item.id); as message) {
+                <p class="item-error" role="alert">{{ message }}</p>
+              }
+            </li>
+          }
+        </ul>
+      }
+    }
+  </section>
+}
