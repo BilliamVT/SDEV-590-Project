@@ -38,5 +38,5 @@ build/
 ### Mac OS ###
 .DS_Store
 
-### Claude Code (personal settings) ###
-.claude/settings.local.json
+### Claude Code (personal settings and preview servers) ###
+.claude/
