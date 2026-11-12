@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
+import { Backlog } from '../backlog/backlog';
 import { HealthService } from '../health/health.service';
 import { HouseholdCard } from '../household/household-card';
 import { WeekView } from '../schedule/week-view';
@@ -10,7 +11,7 @@ type ServerState = 'checking' | 'up' | 'down' | 'unreachable';
 
 @Component({
   selector: 'app-home',
-  imports: [HouseholdCard, RouterLink, WeekView],
+  imports: [Backlog, HouseholdCard, RouterLink, WeekView],
   templateUrl: './home.html',
   styleUrl: './home.scss',
 })

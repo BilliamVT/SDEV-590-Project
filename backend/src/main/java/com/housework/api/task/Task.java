@@ -11,7 +11,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 /**
- * A recurring task (or, later, a one-off backlog item: no rule). Maps the task table (V1).
+ * A recurring task, or a one-off backlog item when it has no rule (BILLIAMVT-23). Maps the task table (V1).
  * Its occurrences are generated from the rule (BILLIAMVT-38).
  */
 @Entity

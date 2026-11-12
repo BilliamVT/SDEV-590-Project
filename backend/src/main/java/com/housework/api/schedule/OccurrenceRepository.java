@@ -1,5 +1,6 @@
 package com.housework.api.schedule;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,21 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 			on conflict (task_id, original_date) do nothing""", nativeQuery = true)
 	int insertIfAbsent(@Param("taskId") long taskId, @Param("date") LocalDate date);
 
+	/**
+	 * Puts a one-off backlog item on a day, pending or already done (BILLIAMVT-23). An open item
+	 * only has skipped days, so a day it was skipped on before is reused rather than duplicated.
+	 */
+	@Modifying
+	@Query(value = """
+			insert into occurrence (task_id, original_date, scheduled_date, status, completed_by, completed_at)
+			values (:taskId, :date, :date, :status, :completedBy, :completedAt)
+			on conflict (task_id, original_date) do update
+			set scheduled_date = excluded.scheduled_date, status = excluded.status,
+			    completed_by = excluded.completed_by, completed_at = excluded.completed_at, updated_at = now()""",
+			nativeQuery = true)
+	void place(@Param("taskId") long taskId, @Param("date") LocalDate date, @Param("status") String status,
+			@Param("completedBy") Long completedBy, @Param("completedAt") Instant completedAt);
+
 	/** Future occurrences that are still pending and haven't been moved; the ones regeneration replaces. */
 	@Modifying
 	@Query(value = """
@@ -41,7 +57,8 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 	String SCHEDULE_ROW = """
 			select new com.housework.api.schedule.ScheduleDtos$ScheduledOccurrence(
 			    o.id, t.id, t.name, o.scheduledDate, o.originalDate, o.status, t.estimatedMinutes,
-			    case when t.deletedAt is null then false else true end, u.displayName, o.completedAt)
+			    case when t.deletedAt is null then false else true end, u.displayName, o.completedAt,
+			    case when t.recurrenceRule is null then true else false end)
 			from Occurrence o
 			join Task t on t.id = o.taskId
 			left join AppUser u on u.id = o.completedBy
@@ -49,11 +66,12 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 
 	/**
 	 * A household's occurrences in a date range, by date and then task name (decision record 0005).
-	 * Deleted tasks' occurrences are included: they're history (BILLIAMVT-22).
+	 * Deleted tasks' occurrences are included: they're history (BILLIAMVT-22). One-off items come
+	 * after the day's recurring tasks (BILLIAMVT-23).
 	 */
 	@Query(SCHEDULE_ROW + """
 			where t.householdId = :householdId and o.scheduledDate between :from and :to
-			order by o.scheduledDate, t.name, o.id""")
+			order by o.scheduledDate, case when t.recurrenceRule is null then 1 else 0 end, t.name, o.id""")
 	List<ScheduledOccurrence> findSchedule(@Param("householdId") long householdId, @Param("from") LocalDate from,
 			@Param("to") LocalDate to);
 

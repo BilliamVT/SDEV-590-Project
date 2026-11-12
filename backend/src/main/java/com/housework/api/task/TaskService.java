@@ -69,7 +69,7 @@ public class TaskService {
 	@Transactional(readOnly = true)
 	public List<TaskResponse> list(long userId) {
 		Household household = households.householdOf(userId);
-		return tasks.findAllByHouseholdIdAndDeletedAtIsNullOrderByNameAscIdAsc(household.getId())
+		return tasks.findRecurring(household.getId())
 			.stream()
 			.map(TaskResponse::from)
 			.toList();
@@ -132,7 +132,7 @@ public class TaskService {
 	}
 
 	private Task task(Household household, long taskId) {
-		return tasks.findByIdAndHouseholdIdAndDeletedAtIsNull(taskId, household.getId())
+		return tasks.findRecurring(household.getId(), taskId)
 			.orElseThrow(TaskNotFoundException::new);
 	}
 
