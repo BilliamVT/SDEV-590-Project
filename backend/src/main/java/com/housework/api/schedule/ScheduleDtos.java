@@ -1,7 +1,10 @@
 package com.housework.api.schedule;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+
+import jakarta.validation.constraints.NotNull;
 
 /** Response bodies for /api/schedule. */
 public final class ScheduleDtos {
@@ -11,7 +14,8 @@ public final class ScheduleDtos {
 
 	/** One row of the schedule query (OccurrenceRepository.findSchedule). */
 	public record ScheduledOccurrence(Long id, Long taskId, String taskName, LocalDate date, LocalDate originalDate,
-			OccurrenceStatus status, Integer estimatedMinutes, boolean taskDeleted) {
+			OccurrenceStatus status, Integer estimatedMinutes, boolean taskDeleted, String completedByName,
+			Instant completedAt) {
 	}
 
 	/**
@@ -19,15 +23,21 @@ public final class ScheduleDtos {
 	 * deleted (a deleted task's missed occurrences are history, not to-dos).
 	 */
 	public record OccurrenceResponse(Long id, Long taskId, String taskName, LocalDate date, LocalDate originalDate,
-			OccurrenceStatus status, Integer estimatedMinutes, boolean overdue, boolean taskDeleted) {
+			OccurrenceStatus status, Integer estimatedMinutes, boolean overdue, boolean taskDeleted,
+			String completedByName, Instant completedAt) {
 
 		static OccurrenceResponse from(ScheduledOccurrence row, LocalDate today) {
 			boolean overdue = !row.taskDeleted() && row.status() == OccurrenceStatus.PENDING
 					&& row.date().isBefore(today);
 			return new OccurrenceResponse(row.id(), row.taskId(), row.taskName(), row.date(), row.originalDate(),
-					row.status(), row.estimatedMinutes(), overdue, row.taskDeleted());
+					row.status(), row.estimatedMinutes(), overdue, row.taskDeleted(), row.completedByName(),
+					row.completedAt());
 		}
 
+	}
+
+	/** PUT /api/occurrences/{id}/status: DONE, SKIPPED, or PENDING to undo (BILLIAMVT-25). */
+	public record StatusRequest(@NotNull OccurrenceStatus status) {
 	}
 
 	/**

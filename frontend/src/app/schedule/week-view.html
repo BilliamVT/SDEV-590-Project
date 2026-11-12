@@ -37,12 +37,60 @@
                     [class.deleted]="occurrence.taskDeleted"
                     [attr.data-status]="occurrence.status"
                   >
-                    <span class="name">{{ occurrence.taskName }}</span>
-                    @if (minutes(occurrence); as text) {
-                      <span class="minutes">{{ text }}</span>
-                    }
-                    @if (occurrence.overdue) {
-                      <span class="overdue-label">Overdue</span>
+                    <div class="details">
+                      <span class="name">{{ occurrence.taskName }}</span>
+                      @if (minutes(occurrence); as text) {
+                        <span class="minutes">{{ text }}</span>
+                      }
+                      @if (occurrence.overdue) {
+                        <span class="overdue-label">Overdue</span>
+                      }
+                      @if (occurrence.status === 'DONE') {
+                        <span class="status-label">✓ Done by {{ occurrence.completedByName ?? 'a former member' }}</span>
+                      } @else if (occurrence.status === 'SKIPPED') {
+                        <span class="status-label">Skipped by {{ occurrence.completedByName ?? 'a former member' }}</span>
+                      }
+                    </div>
+                    <div class="actions">
+                      @if (occurrence.status === 'PENDING') {
+                        <button
+                          type="button"
+                          [attr.aria-label]="'Mark ' + occurrence.taskName + ' done'"
+                          [disabled]="saving().has(occurrence.id)"
+                          (click)="setStatus(occurrence, 'DONE')"
+                        >
+                          Done
+                        </button>
+                        <button
+                          type="button"
+                          [attr.aria-label]="'Skip ' + occurrence.taskName"
+                          [disabled]="saving().has(occurrence.id)"
+                          (click)="setStatus(occurrence, 'SKIPPED')"
+                        >
+                          Skip
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          [attr.aria-label]="'Undo ' + occurrence.taskName"
+                          [disabled]="saving().has(occurrence.id)"
+                          (click)="setStatus(occurrence, 'PENDING')"
+                        >
+                          Undo
+                        </button>
+                      }
+                      <button
+                        type="button"
+                        class="delete"
+                        [attr.aria-label]="'Delete ' + occurrence.taskName + ' on ' + day.label"
+                        [disabled]="saving().has(occurrence.id)"
+                        (click)="delete(occurrence)"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    @if (itemErrors().get(occurrence.id); as message) {
+                      <p class="item-error" role="alert">{{ message }}</p>
                     }
                   </li>
                 }

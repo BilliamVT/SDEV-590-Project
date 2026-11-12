@@ -13,6 +13,9 @@ export interface ScheduledOccurrence {
   overdue: boolean;
   /** The task was deleted; its past occurrences stay as history (BILLIAMVT-22) */
   taskDeleted: boolean;
+  /** Who marked it done or skipped, and when (ISO instant); null while pending (BILLIAMVT-25) */
+  completedByName: string | null;
+  completedAt: string | null;
 }
 
 export interface Schedule {
