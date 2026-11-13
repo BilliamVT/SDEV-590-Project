@@ -1,9 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, Subject, of, throwError } from 'rxjs';
 
 import { CreateTaskRequest, Task } from './task.models';
+import { Household } from '../household/household.models';
+import { HouseholdService } from '../household/household.service';
+import { toIsoDate } from '../schedule/dates';
 import { NewTask } from './new-task';
 import { TaskService } from './task.service';
 
@@ -29,11 +33,17 @@ describe('NewTask', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  async function render(create: (request: CreateTaskRequest) => Observable<Task> = (r) => of(savedTask(r))) {
+  /** The household's time zone already known, and its today the same as the device's */
+  const knownHousehold = () => ({ timeZoneKnown: () => true, today: () => toIsoDate(new Date()), load: vi.fn() });
+
+  async function render(
+    create: (request: CreateTaskRequest) => Observable<Task> = (r) => of(savedTask(r)),
+    households: object = knownHousehold(),
+  ) {
     const tasks = { create: vi.fn(create) };
     await TestBed.configureTestingModule({
       imports: [NewTask],
-      providers: [provideRouter([]), { provide: TaskService, useValue: tasks }],
+      providers: [provideRouter([]), { provide: TaskService, useValue: tasks }, { provide: HouseholdService, useValue: households }],
     }).compileComponents();
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -59,7 +69,7 @@ describe('NewTask', () => {
       element.querySelector<HTMLButtonElement>(`#task-day button[aria-label="${day}"]`)!.click();
       await fixture.whenStable();
     };
-    return { tasks, router, element, set, submit, click, toggle };
+    return { tasks, router, fixture, element, set, submit, click, toggle };
   }
 
   it('creates a weekly task with only the fields it needs, then shows the week', async () => {
@@ -99,6 +109,52 @@ describe('NewTask', () => {
     await submit();
 
     expect(tasks.create).toHaveBeenCalledWith({ name: 'Water plants', frequency: 'EVERY_N_DAYS', interval: 10, startsOn: '2026-11-07' });
+  });
+
+  describe("the household's today (BILLIAMVT-51)", () => {
+    /** Opened by a link or a reload: the time zone arrives with the household, a day ahead of the device */
+    function unknownHousehold(arrives: Observable<Household | null>) {
+      // Signals, as in HouseholdService, so the page updates when the household arrives
+      const zone = signal<string | null>(null);
+      const load = vi.fn(() => {
+        arrives.subscribe(() => zone.set('a day ahead'));
+        return arrives;
+      });
+      return { timeZoneKnown: () => zone() !== null, today: () => (zone() ? '2026-11-05' : '2026-11-04'), load };
+    }
+
+    it("loads the household, then starts on its today and doesn't allow earlier", async () => {
+      const arrives = new Subject<Household | null>();
+      const households = unknownHousehold(arrives);
+      const { fixture, element, set } = await render(undefined, households);
+      await set('task-frequency', 'EVERY_N_DAYS');
+      expect(households.load).toHaveBeenCalledTimes(1);
+
+      arrives.next(null);
+      arrives.complete();
+      await fixture.whenStable();
+      const start = element.querySelector<HTMLInputElement>('#task-start')!;
+      expect(start.value).toBe('2026-11-05');
+      expect(start.min).toBe('2026-11-05');
+    });
+
+    it('keeps a start date the user already chose', async () => {
+      const arrives = new Subject<Household | null>();
+      const { fixture, element, set } = await render(undefined, unknownHousehold(arrives));
+      await set('task-frequency', 'EVERY_N_DAYS');
+      await set('task-start', '2026-11-20');
+
+      arrives.next(null);
+      arrives.complete();
+      await fixture.whenStable();
+      expect(element.querySelector<HTMLInputElement>('#task-start')!.value).toBe('2026-11-20');
+    });
+
+    it("doesn't load the household again when its time zone is known", async () => {
+      const households = knownHousehold();
+      await render(undefined, households);
+      expect(households.load).not.toHaveBeenCalled();
+    });
   });
 
   it('previews when a task with a start date first happens', async () => {

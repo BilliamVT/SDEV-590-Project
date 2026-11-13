@@ -2,6 +2,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
 
+import { HouseholdService } from '../household/household.service';
+import { toIsoDate } from '../schedule/dates';
 import { Backlog } from './backlog';
 import { BacklogItem, CreateItemRequest } from './backlog.models';
 import { BacklogService } from './backlog.service';
@@ -27,6 +29,7 @@ describe('Backlog (BILLIAMVT-23)', () => {
       schedule: (id: number, date: string) => Observable<void>;
       done: (id: number, date: string) => Observable<void>;
       delete: (id: number) => Observable<void>;
+      today: () => string;
     }> = {},
   ) {
     const backlog = {
@@ -38,7 +41,11 @@ describe('Backlog (BILLIAMVT-23)', () => {
     };
     await TestBed.configureTestingModule({
       imports: [Backlog],
-      providers: [{ provide: BacklogService, useValue: backlog }],
+      providers: [
+        { provide: BacklogService, useValue: backlog },
+        // The household's today; the device's by default
+        { provide: HouseholdService, useValue: { today: overrides.today ?? (() => toIsoDate(new Date())) } },
+      ],
     }).compileComponents();
     const fixture = TestBed.createComponent(Backlog);
     const placed = vi.fn();
@@ -116,6 +123,22 @@ describe('Backlog (BILLIAMVT-23)', () => {
     expect(names()).toEqual(['Clean gutters']);
     expect(element.querySelector('.notice')?.textContent).toBe('Marked "Hang shelves" done on Wednesday, Nov 11.');
     expect(placed).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts the day picker on the household's today, not the device's (BILLIAMVT-51)", async () => {
+    // The household is a day ahead of this device
+    const { backlog, element, click } = await render({ today: () => '2026-11-12' });
+    await click('Mark Hang shelves done');
+    const day = () => element.querySelector<HTMLInputElement>('#backlog-day-1')!;
+    expect(day().value).toBe('2026-11-12');
+    expect(day().max).toBe('2026-11-12');
+    await click('Mark done');
+    expect(backlog.done).toHaveBeenCalledWith(1, '2026-11-12');
+
+    await click('Schedule Clean gutters');
+    const schedule = element.querySelector<HTMLInputElement>('#backlog-day-2')!;
+    expect(schedule.value).toBe('2026-11-12');
+    expect(schedule.min).toBe('2026-11-12');
   });
 
   it('marks an item done on an earlier day', async () => {

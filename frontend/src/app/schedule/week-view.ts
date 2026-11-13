@@ -28,8 +28,12 @@ export class WeekView {
   /** A status changed or a day was deleted; a one-off item may be back in the backlog (BILLIAMVT-23). */
   readonly changed = output<void>();
 
-  private readonly thisWeek = startOfWeek(toIsoDate(new Date()));
-  protected readonly weekStart = signal(this.thisWeek);
+  /**
+   * The week with the household's today. The device's date is a first guess, corrected from the
+   * server's today, which is in the household's time zone (BILLIAMVT-51).
+   */
+  private readonly thisWeek = signal(startOfWeek(toIsoDate(new Date())));
+  protected readonly weekStart = signal(this.thisWeek());
   protected readonly weekEnd = computed(() => addDays(this.weekStart(), 6));
   protected readonly title = computed(() => weekLabel(this.weekStart(), this.weekEnd()));
   protected readonly schedule = signal<Schedule | null>(null);
@@ -63,7 +67,7 @@ export class WeekView {
     return last !== undefined && addDays(this.weekEnd(), 7) > last;
   });
 
-  protected readonly isThisWeek = computed(() => this.weekStart() === this.thisWeek);
+  protected readonly isThisWeek = computed(() => this.weekStart() === this.thisWeek());
 
   constructor() {
     this.load();
@@ -80,7 +84,7 @@ export class WeekView {
   }
 
   protected today(): void {
-    this.go(this.thisWeek);
+    this.go(this.thisWeek());
   }
 
   protected minutes(occurrence: ScheduledOccurrence): string | null {
@@ -176,6 +180,15 @@ export class WeekView {
     this.error.set(null);
     this.schedules.between(this.weekStart(), this.weekEnd()).subscribe({
       next: (schedule) => {
+        const householdWeek = startOfWeek(schedule.today);
+        if (householdWeek !== this.thisWeek()) {
+          const showingThisWeek = this.weekStart() === this.thisWeek();
+          this.thisWeek.set(householdWeek);
+          if (showingThisWeek) {
+            this.go(householdWeek);
+            return;
+          }
+        }
         this.schedule.set(schedule);
         this.noHousehold.set(false);
         this.loading.set(false);

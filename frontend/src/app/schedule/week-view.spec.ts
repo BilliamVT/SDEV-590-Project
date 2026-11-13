@@ -106,6 +106,16 @@ describe('WeekView', () => {
     expect(item?.querySelector('.overdue-label')).toBeNull();
   });
 
+  it("shows the household's week when its today is in another week than the device's (BILLIAMVT-51)", async () => {
+    // The device says Wednesday Nov 11; the household, far ahead, is already on Sunday Nov 15
+    const { schedules, element, button } = await render((from, to) => of({ ...schedule(from, to), today: '2026-11-15' }));
+
+    expect(schedules.between).toHaveBeenLastCalledWith('2026-11-15', '2026-11-21');
+    expect(element.querySelector('h2')?.textContent).toBe('Nov 15 – 21, 2026');
+    expect(element.querySelector('.day.today h3')?.textContent).toContain('Sunday, Nov 15');
+    expect(button('This week').disabled).toBe(true);
+  });
+
   it('moves between weeks', async () => {
     const { schedules, element, click, button } = await render();
     expect(button('This week').disabled).toBe(true);

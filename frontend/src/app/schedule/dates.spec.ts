@@ -1,6 +1,14 @@
-import { addDays, dayLabel, startOfWeek, weekLabel } from './dates';
+import { addDays, dayLabel, startOfWeek, todayIn, weekLabel } from './dates';
 
 describe('dates', () => {
+  it("works out today in a time zone, whatever the device's zone (BILLIAMVT-51)", () => {
+    // 3 AM UTC on Nov 12: still the evening of Nov 11 in New York, already Nov 12 in Tokyo
+    const now = new Date(Date.UTC(2026, 10, 12, 3));
+    expect(todayIn('America/New_York', now)).toBe('2026-11-11');
+    expect(todayIn('Asia/Tokyo', now)).toBe('2026-11-12');
+    expect(todayIn('Pacific/Kiritimati', new Date(Date.UTC(2026, 11, 31, 11)))).toBe('2027-01-01');
+  });
+
   it('starts weeks on Sunday', () => {
     expect(startOfWeek('2026-11-11')).toBe('2026-11-08'); // Wednesday
     expect(startOfWeek('2026-11-08')).toBe('2026-11-08'); // Sunday
