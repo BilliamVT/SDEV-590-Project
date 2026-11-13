@@ -3,6 +3,8 @@ import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angul
 import { of } from 'rxjs';
 
 import { CreateTaskRequest, Task } from './task.models';
+import { HouseholdService } from '../household/household.service';
+import { toIsoDate } from '../schedule/dates';
 import { NewTask } from './new-task';
 import { TaskService } from './task.service';
 
@@ -39,6 +41,7 @@ describe('NewTask (editing)', () => {
       providers: [
         provideRouter([]),
         { provide: TaskService, useValue: tasks },
+        { provide: HouseholdService, useValue: { timeZoneKnown: () => true, today: () => toIsoDate(new Date()) } },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: '7' }) } } },
       ],
     }).compileComponents();

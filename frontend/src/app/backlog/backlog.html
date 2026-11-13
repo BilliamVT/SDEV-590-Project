@@ -52,8 +52,8 @@
                     [id]="'backlog-day-' + item.id"
                     type="date"
                     [value]="picking()!.date"
-                    [attr.min]="picking()!.action === 'schedule' ? today : null"
-                    [attr.max]="picking()!.action === 'done' ? today : null"
+                    [attr.min]="picking()!.action === 'schedule' ? today() : null"
+                    [attr.max]="picking()!.action === 'done' ? today() : null"
                     (input)="setDate($any($event.target).value)"
                   />
                   <button type="button" [disabled]="saving().has(item.id)" (click)="confirm(item)">

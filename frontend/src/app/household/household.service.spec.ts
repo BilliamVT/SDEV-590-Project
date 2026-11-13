@@ -78,6 +78,31 @@ describe('HouseholdService', () => {
     request.flush(household);
   });
 
+  it("remembers the household's time zone for its today, and follows a join to another (BILLIAMVT-51)", () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // 3 AM UTC on Nov 12: Nov 11 in New York, Nov 12 in Tokyo
+    vi.setSystemTime(new Date(Date.UTC(2026, 10, 12, 3)));
+    try {
+      expect(service.timeZoneKnown()).toBe(false);
+
+      service.load().subscribe();
+      http.expectOne(url).flush(household);
+      expect(service.timeZoneKnown()).toBe(true);
+      expect(service.today()).toBe('2026-11-11');
+
+      service.join('k7qm-3xrp').subscribe();
+      http.expectOne(`${url}/join`).flush({ ...household, timeZone: 'Asia/Tokyo' });
+      expect(service.today()).toBe('2026-11-12');
+
+      // No household any more (e.g. another user logs in on this device)
+      service.load().subscribe();
+      http.expectOne(url).flush(null, { status: 404, statusText: 'Not Found' });
+      expect(service.timeZoneKnown()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('formats invite codes in two groups of four', () => {
     expect(formatInviteCode('K7QM3XRP')).toBe('K7QM-3XRP');
   });

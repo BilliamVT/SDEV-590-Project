@@ -117,7 +117,7 @@ ng test
 
 When writing a test, find elements the way a user does (`getByRole`, `getByLabel`) and use the helpers in `e2e/tests/helpers.ts`. Before typing into a form reached by a link inside the app, call `formReady(field)`: Playwright can type before Angular has set up the form, and Angular then clears the field.
 
-A test for a known defect is marked `test.fail()` with a comment saying why (as in `time-zones.spec.ts`): it passes while the bug is there, and Playwright reports it as "passed unexpectedly" once the fix lands, the cue to remove the mark.
+A test for a known defect is marked `test.fail()` with a comment naming the bug's Jira key: it passes while the bug is there, and Playwright reports it as "passed unexpectedly" once the fix lands, the cue to remove the mark.
 
 First time, from `e2e/`:
 

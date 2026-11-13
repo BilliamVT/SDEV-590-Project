@@ -5,12 +5,8 @@ import { addBacklogItem, backlog, createHousehold, formReady, inviteCode, joinHo
 /*
  * The household's "today" comes from the time zone of the browser that created it; members can
  * live, or travel, somewhere else. Pago Pago (UTC-11) and Kiritimati (UTC+14) are 25 hours apart,
- * so their dates always differ, whatever time the tests run.
- *
- * Known defect (BILLIAMVT-51): the front end uses the viewer's own clock for "today" (backlog Done default,
- * the start date on the task form) while the server uses the household's time zone. These tests
- * describe the correct behaviour and are marked test.fail() until it's fixed; Playwright then
- * reports them as "passed unexpectedly", the cue to remove the mark.
+ * so their dates always differ, whatever time the tests run. The front end must use the
+ * household's today, as the server does, not the device's clock (BILLIAMVT-51).
  */
 const BEHIND = 'Pacific/Pago_Pago';
 const AHEAD = 'Pacific/Kiritimati';
@@ -30,7 +26,7 @@ async function householdAcrossZones(browser: Browser, householdZone: string, sam
   return sam;
 }
 
-test.fail('a member ahead of the household marks a backlog item done with the default day', async ({ browser }) => {
+test('a member ahead of the household marks a backlog item done with the default day', async ({ browser }) => {
   const sam = await householdAcrossZones(browser, BEHIND, AHEAD);
   await addBacklogItem(sam, 'Hang shelves');
 
@@ -43,10 +39,11 @@ test.fail('a member ahead of the household marks a backlog item done with the de
   await sam.context().close();
 });
 
-test.fail('a member behind the household adds a task starting on the default day', async ({ browser }) => {
+test('a member behind the household adds a task starting on the default day', async ({ browser }) => {
   const sam = await householdAcrossZones(browser, AHEAD, BEHIND);
 
-  await sam.getByRole('link', { name: 'Add a task' }).click();
+  // Opened directly (a bookmark or a reload), before anything has loaded the household
+  await sam.goto('/tasks/new');
   const name = sam.getByLabel('Task', { exact: true });
   await formReady(name);
   await name.fill('Water plants');

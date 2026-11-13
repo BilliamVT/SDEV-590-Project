@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { errorMessage } from '../auth/error-message';
+import { HouseholdService } from '../household/household.service';
 import { CreateTaskRequest, DayOfWeek, Frequency } from './task.models';
 import { TaskService } from './task.service';
 
@@ -27,6 +28,7 @@ const INTERVAL_LIMITS: Partial<Record<Frequency, { max: number; unit: string }>>
 })
 export class NewTask {
   private readonly tasks = inject(TaskService);
+  private readonly households = inject(HouseholdService);
   private readonly router = inject(Router);
   /** Set when editing an existing task. */
   protected readonly taskId = Number(inject(ActivatedRoute).snapshot.paramMap.get('id')) || null;
@@ -52,17 +54,28 @@ export class NewTask {
     // None chosen at first: a preselected day would be easy to keep by accident when tapping another
     daysOfWeek: [[] as DayOfWeek[]],
     dayOfMonth: [1],
-    startsOn: [today()],
+    startsOn: [this.households.today()],
     estimatedMinutes: [null as number | null, [Validators.min(1), Validators.max(1440)]],
   });
-  /** The start date is the first time it's due, so it can't be earlier than today. */
-  protected readonly today = today();
   protected readonly attempted = signal(false);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly loading = signal(this.taskId !== null);
 
   constructor() {
+    // Reached straight from a link or a reload, the household's time zone may not be known yet
+    if (!this.households.timeZoneKnown()) {
+      this.households.load().subscribe({
+        next: () => {
+          const start = this.form.controls.startsOn;
+          if (this.taskId === null && start.pristine) {
+            start.setValue(this.today());
+          }
+        },
+        // The browser's today stays as the guess; the server still checks the date
+        error: () => undefined,
+      });
+    }
     if (this.taskId !== null) {
       this.tasks.get(this.taskId).subscribe({
         next: (task) => {
@@ -86,10 +99,15 @@ export class NewTask {
     }
   }
 
+  /** The household's today (BILLIAMVT-51): a start date can't be earlier than it. */
+  protected today(): string {
+    return this.households.today();
+  }
+
   /** The date picker's minimum: today, or an edited task's existing start if that's earlier. */
   protected minStart(): string {
     const original = this.originalStart();
-    return original && original < this.today ? original : this.today;
+    return original && original < this.today() ? original : this.today();
   }
 
   /** "Every week on Saturday" → "every week on Saturday", to follow "Saved: Vacuum," */
@@ -135,7 +153,7 @@ export class NewTask {
   protected preview(): string | null {
     const value = this.form.getRawValue();
     // An edited task's unchanged start can be in the past; "first time" would be misleading then
-    if (!this.needsStartDate() || this.startInvalid() || this.intervalInvalid() || this.daysInvalid() || value.startsOn! < this.today) {
+    if (!this.needsStartDate() || this.startInvalid() || this.intervalInvalid() || this.daysInvalid() || value.startsOn! < this.today()) {
       return null;
     }
     const [year, month, day] = value.startsOn!.split('-').map(Number);
@@ -166,7 +184,7 @@ export class NewTask {
   protected startInvalid(): boolean {
     const startsOn = this.form.controls.startsOn.value;
     // yyyy-mm-dd strings compare in date order; an edited task may keep its existing start
-    return this.needsStartDate() && (!startsOn || (startsOn < this.today && startsOn !== this.originalStart()));
+    return this.needsStartDate() && (!startsOn || (startsOn < this.today() && startsOn !== this.originalStart()));
   }
 
   protected intervalInvalid(): boolean {
@@ -207,10 +225,4 @@ export class NewTask {
     if (value.estimatedMinutes) request.estimatedMinutes = value.estimatedMinutes;
     return request;
   }
-}
-
-/** Today in the browser's time zone, as yyyy-mm-dd. */
-function today(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }

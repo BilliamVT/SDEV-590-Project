@@ -4,7 +4,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Observable } from 'rxjs';
 
 import { errorMessage } from '../auth/error-message';
-import { dayLabel, toIsoDate } from '../schedule/dates';
+import { HouseholdService } from '../household/household.service';
+import { dayLabel } from '../schedule/dates';
 import { BacklogItem } from './backlog.models';
 import { BacklogService } from './backlog.service';
 
@@ -27,11 +28,11 @@ interface Picking {
 })
 export class Backlog {
   private readonly backlog = inject(BacklogService);
+  private readonly households = inject(HouseholdService);
 
   /** An item went onto a day, so the week view should reload. */
   readonly placed = output<void>();
 
-  protected readonly today = toIsoDate(new Date());
   protected readonly items = signal<BacklogItem[] | null>(null);
   protected readonly error = signal<string | null>(null);
   /** The user has no household yet; the household card asks them to set one up. */
@@ -98,9 +99,14 @@ export class Backlog {
     });
   }
 
+  /** The household's today (BILLIAMVT-51): the server checks picked days against it. */
+  protected today(): string {
+    return this.households.today();
+  }
+
   /** Opens the day picker; it starts on today for both actions. */
   protected pick(item: BacklogItem, action: Picking['action']): void {
-    this.picking.set({ id: item.id, action, date: this.today });
+    this.picking.set({ id: item.id, action, date: this.today() });
     this.notice.set(null);
     this.itemErrors.update((errors) => removeError(errors, item.id));
   }

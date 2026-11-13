@@ -1,5 +1,14 @@
 /** Calendar dates as yyyy-mm-dd strings, worked out in local time (no time-zone shifts). */
 
+/**
+ * Today in a time zone, e.g. the household's (BILLIAMVT-51). The server decides "today" in the
+ * household's zone, so dates the user picks are checked against that, not the device's clock.
+ */
+export function todayIn(timeZone: string, now: Date = new Date()): string {
+  // en-CA formats dates as yyyy-mm-dd
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
 export function toIsoDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
