@@ -43,6 +43,8 @@ describe('HouseholdCard', () => {
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(HouseholdCard);
+    const changed = vi.fn();
+    fixture.componentInstance.changed.subscribe(changed);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     const click = async (text: string) => {
@@ -54,7 +56,7 @@ describe('HouseholdCard', () => {
       input.value = value;
       input.dispatchEvent(new Event('input'));
     };
-    return { element, households, click, typeCode };
+    return { element, households, click, typeCode, changed };
   }
 
   it('shows the household, its members and the invite code', async () => {
@@ -65,17 +67,20 @@ describe('HouseholdCard', () => {
   });
 
   it('warns before leaving a household the user is the only member of, then joins', async () => {
-    const { element, households, click, typeCode } = await render();
+    const { element, households, click, typeCode, changed } = await render();
     typeCode('abcd-2345');
     await click('Join');
 
     expect(households.join).not.toHaveBeenCalled();
+    expect(changed).not.toHaveBeenCalled();
     expect(element.textContent).toContain('it will be deleted along with its tasks');
 
     await click('Leave and join');
     expect(households.join).toHaveBeenCalledWith('abcd-2345');
     expect(element.textContent).toContain("Sam's household");
     expect(element.querySelectorAll('li')).toHaveLength(2);
+    // The week and backlog reload for the new household
+    expect(changed).toHaveBeenCalledTimes(1);
   });
 
   it('cancelling does not join', async () => {
@@ -103,9 +108,10 @@ describe('HouseholdCard', () => {
   });
 
   it('replaces the invite code', async () => {
-    const { element, click } = await render();
+    const { element, click, changed } = await render();
     await click('New code');
     expect(element.querySelector('code')?.textContent).toBe('NEWC-0DE2');
+    expect(changed).not.toHaveBeenCalled();
   });
 
   describe('without a household', () => {
@@ -117,21 +123,24 @@ describe('HouseholdCard', () => {
     });
 
     it('creates the household and then shows it', async () => {
-      const { element, households, click, typeCode } = await render(undefined, null);
+      const { element, households, click, typeCode, changed } = await render(undefined, null);
       typeCode('The Flat', 'household-name');
       await click('Create household');
 
       expect(households.create).toHaveBeenCalledWith('The Flat');
+      // The week and backlog, hidden without a household, load now (found by the e2e tests, BILLIAMVT-47)
+      expect(changed).toHaveBeenCalledTimes(1);
       expect(element.textContent).not.toContain('Set up your household');
       expect(element.querySelector('.name')?.textContent).toBe('The Flat');
     });
 
     it('joins straight away, with no warning since there is nothing to leave', async () => {
-      const { element, households, click, typeCode } = await render(undefined, null);
+      const { element, households, click, typeCode, changed } = await render(undefined, null);
       typeCode('abcd-2345', 'setup-invite-code');
       await click('Join household');
 
       expect(households.join).toHaveBeenCalledWith('abcd-2345');
+      expect(changed).toHaveBeenCalledTimes(1);
       expect(element.textContent).toContain("Sam's household");
     });
 

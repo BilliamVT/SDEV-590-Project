@@ -200,6 +200,20 @@ describe('Backlog (BILLIAMVT-23)', () => {
     expect(element.querySelector('.notice')).toBeNull();
   });
 
+  it('shows the backlog once a household exists and it reloads (BILLIAMVT-47)', async () => {
+    let household = false;
+    const { element, fixture } = await render({
+      list: () => (household ? of([shelves]) : throwError(() => new HttpErrorResponse({ status: 404 }))),
+    });
+    expect(element.querySelector('.backlog')).toBeNull();
+
+    household = true;
+    fixture.componentInstance.reload();
+    await fixture.whenStable();
+
+    expect(element.querySelector('.backlog')).not.toBeNull();
+  });
+
   it('shows nothing without a household', async () => {
     const { element } = await render({ list: () => throwError(() => new HttpErrorResponse({ status: 404 })) });
     expect(element.querySelector('.backlog')).toBeNull();

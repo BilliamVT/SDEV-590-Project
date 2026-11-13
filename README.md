@@ -111,6 +111,33 @@ Front-end tests (Vitest), from `frontend/`:
 ng test
 ```
 
+### End-to-end tests
+
+[Playwright](https://playwright.dev) tests in `e2e/` drive the real app in **Chromium** and **WebKit** (Safari's engine, run as an iPhone): registering, logging in and out, sessions and page guards, login and registration errors, deleting an account; creating, joining and renaming a household, invite codes, and two members sharing the schedule; adding a task (including one on several days), marking it done, skipping or deleting a day, editing, pausing and deleting a task; and every backlog action. Add a test here when a story adds a new flow, and keep edge cases in the backend and front-end tests.
+
+When writing a test, find elements the way a user does (`getByRole`, `getByLabel`) and use the helpers in `e2e/tests/helpers.ts`. Before typing into a form reached by a link inside the app, call `formReady(field)`: Playwright can type before Angular has set up the form, and Angular then clears the field.
+
+A test for a known defect is marked `test.fail()` with a comment saying why (as in `time-zones.spec.ts`): it passes while the bug is there, and Playwright reports it as "passed unexpectedly" once the fix lands, the cue to remove the mark.
+
+First time, from `e2e/`:
+
+```bash
+npm install
+npx playwright install chromium webkit
+```
+
+Then, with the Compose database running (`docker compose up -d`):
+
+```bash
+npx playwright test
+```
+
+- If the backend (8080) and front end (4200) are already running, the tests use them and leave them running. Otherwise they start `mvn spring-boot:run` and `ng serve` and stop them afterwards.
+- Each test signs up new users with random `e2e-…@example.test` emails, so they leave throwaway accounts in the local database. They're harmless; `docker compose down -v` clears everything, including your own test data.
+- `npx playwright test --ui` opens an interactive runner; `npx playwright show-report` opens the last report.
+
+In CI, the **End-to-end tests** job runs on every PR that changes `backend/`, `frontend/` or `e2e/`, against Postgres in a service container and the servers started inside the job (never production). It's a required check, so a failing test blocks merging. When it fails, download the run's **playwright-report** artifact and open it with `npx playwright show-report <folder>`; each failed test has a trace (`npx playwright show-trace <trace.zip>`) that steps through every action with screenshots.
+
 ## Build and run the jar
 
 ```bash

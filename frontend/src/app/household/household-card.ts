@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { errorMessage } from '../auth/error-message';
@@ -18,6 +18,9 @@ import { HouseholdService, formatInviteCode } from './household.service';
 })
 export class HouseholdCard {
   private readonly households = inject(HouseholdService);
+
+  /** The user now has a different household (set up or joined): the week and backlog should reload. */
+  readonly changed = output<void>();
 
   protected readonly household = signal<Household | null>(null);
   protected readonly needsSetup = signal(false);
@@ -42,6 +45,7 @@ export class HouseholdCard {
   protected setUp(household: Household): void {
     this.household.set(household);
     this.needsSetup.set(false);
+    this.changed.emit();
   }
 
   protected leaveWarning(household: Household): string {
@@ -63,6 +67,7 @@ export class HouseholdCard {
     this.run(this.households.join(this.joinForm.controls.code.value), () => {
       this.confirming.set(false);
       this.joinForm.reset();
+      this.changed.emit();
     });
   }
 

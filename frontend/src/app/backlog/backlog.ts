@@ -55,12 +55,13 @@ export class Backlog {
     this.reload();
   }
 
-  /** Called after the week view changes: a skipped or deleted day puts its item back here. */
+  /** Called after the week view changes (a removed day puts its item back here), or the household changes. */
   reload(): void {
     this.notice.set(null);
     this.backlog.list().subscribe({
       next: (items) => {
         this.items.set(items);
+        this.noHousehold.set(false);
         this.error.set(null);
       },
       error: (err: unknown) => {
