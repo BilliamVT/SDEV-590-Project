@@ -17,7 +17,8 @@
 
 <app-backlog #backlog (placed)="week.reload()" />
 
-<app-household-card />
+<!-- A new or different household: the week and backlog load again -->
+<app-household-card (changed)="week.reload(); backlog.reload()" />
 
 <section class="status" [attr.data-state]="state()">
   <h2>Server status</h2>

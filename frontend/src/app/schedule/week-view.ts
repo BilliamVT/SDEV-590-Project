@@ -161,7 +161,7 @@ export class WeekView {
     });
   }
 
-  /** Called after a backlog item is put on a day. */
+  /** Called after a backlog item is put on a day, or the household changes. */
   reload(): void {
     this.load();
   }
@@ -177,6 +177,7 @@ export class WeekView {
     this.schedules.between(this.weekStart(), this.weekEnd()).subscribe({
       next: (schedule) => {
         this.schedule.set(schedule);
+        this.noHousehold.set(false);
         this.loading.set(false);
       },
       error: (err: unknown) => {

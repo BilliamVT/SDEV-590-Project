@@ -350,4 +350,18 @@ describe('WeekView', () => {
       expect(element.querySelector('.delete-choice')).not.toBeNull();
     });
   });
+
+  it('shows the week once a household exists and it reloads (BILLIAMVT-47)', async () => {
+    let household = false;
+    const { element, fixture } = await render((from, to) =>
+      household ? of(schedule(from, to)) : throwError(() => new HttpErrorResponse({ status: 404 })),
+    );
+    expect(element.querySelector('.week')).toBeNull();
+
+    household = true;
+    fixture.componentInstance.reload();
+    await fixture.whenStable();
+
+    expect(element.querySelector('.week')).not.toBeNull();
+  });
 });
