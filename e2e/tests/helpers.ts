@@ -25,7 +25,8 @@ export async function createHousehold(page: Page, name: string): Promise<void> {
   await formReady(page.getByLabel('Name', { exact: true }));
   await page.getByLabel('Name', { exact: true }).fill(name);
   await page.getByRole('button', { name: 'Create household' }).click();
-  await expect(page.getByRole('heading', { name: 'Household', exact: true })).toBeVisible();
+  // The household's details are in Settings; home confirms it and shows the week (BILLIAMVT-49)
+  await expect(page.getByRole('status').filter({ hasText: `${name} is ready.` })).toBeVisible();
 }
 
 /** Logs in from the login page. */
@@ -84,9 +85,25 @@ export async function weekLoaded(page: Page): Promise<void> {
   await expect(page.locator('.days')).not.toHaveClass(/refreshing/);
 }
 
-/** The household's invite code, from the household card on the home page. */
+/** The household's invite code, from Settings (BILLIAMVT-49). Leaves the page on Settings. */
 export async function inviteCode(page: Page): Promise<string> {
+  await openSettings(page);
   return page.locator('.invite code').innerText();
+}
+
+/** Opens Settings from the header, as a user would. */
+export async function openSettings(page: Page): Promise<void> {
+  await page.getByRole('navigation', { name: 'Account' }).getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Settings', level: 2 })).toBeVisible();
+}
+
+/** Checks the household's name and members in Settings. Leaves the page on Settings. */
+export async function expectHousehold(page: Page, name: string, members?: string[]): Promise<void> {
+  await openSettings(page);
+  await expect(page.locator('.setting .name')).toHaveText(name);
+  if (members) {
+    await expect(page.locator('.members li')).toHaveText(members);
+  }
 }
 
 /** Joins a household from the setup form a new account sees. */
@@ -95,6 +112,12 @@ export async function joinHousehold(page: Page, code: string): Promise<void> {
   await formReady(field);
   await field.fill(code);
   await page.getByRole('button', { name: 'Join household' }).click();
+}
+
+/** Joins with a code that should work, and waits until the household is set up. */
+export async function joinHouseholdNamed(page: Page, code: string, name: string): Promise<void> {
+  await joinHousehold(page, code);
+  await expect(page.getByRole('status').filter({ hasText: `${name} is ready.` })).toBeVisible();
 }
 
 /** The backlog section under the week. */
@@ -114,4 +137,14 @@ export async function addBacklogItem(page: Page, name: string): Promise<void> {
 /** One item in the backlog list. */
 export function backlogItem(page: Page, name: string): Locator {
   return backlog(page).getByRole('listitem').filter({ hasText: name });
+}
+
+/** Opens a row's ⋯ menu (Skip, Delete, Remove; Mark done in the backlog), in the week view or the backlog. */
+export async function openMenu(scope: Locator, name: string): Promise<void> {
+  await scope.getByRole('button', { name: new RegExp(`^More for ${name}`) }).click();
+}
+
+/** The action sheet that asks before deleting (BILLIAMVT-49). */
+export function confirmSheet(page: Page): Locator {
+  return page.getByRole('dialog');
 }
