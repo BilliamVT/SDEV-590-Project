@@ -41,6 +41,10 @@ public final class ScheduleDtos {
 	public record StatusRequest(@NotNull OccurrenceStatus status) {
 	}
 
+	/** PUT /api/occurrences/{id}/date: the day to move it to (BILLIAMVT-27). */
+	public record MoveRequest(@NotNull LocalDate date) {
+	}
+
 	/**
 	 * {@code today} is the household's (its time zone), so the front end marks the same day;
 	 * {@code lastViewableDate} is how far ahead the schedule can be viewed.

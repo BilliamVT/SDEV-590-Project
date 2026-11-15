@@ -68,6 +68,11 @@ public class Occurrence {
 		return status;
 	}
 
+	/** To another day (BILLIAMVT-27); back on its original date it's a normal day again. */
+	void moveTo(LocalDate date) {
+		scheduledDate = date;
+	}
+
 	/** Done or skipped records who and when; back to pending (undo) clears them. Same status: no change. */
 	void changeStatus(OccurrenceStatus newStatus, long userId, Instant now) {
 		if (newStatus == status) {
