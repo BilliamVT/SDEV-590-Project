@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.housework.api.feature.FeatureFlags;
 import com.housework.api.household.Household;
 import com.housework.api.household.HouseholdService;
 import com.housework.api.schedule.ScheduleDtos.OccurrenceResponse;
@@ -39,14 +40,17 @@ public class ScheduleService {
 
 	private final ScheduleGenerator generator;
 
+	private final FeatureFlags flags;
+
 	private final Clock clock;
 
 	ScheduleService(HouseholdService households, TaskRepository tasks, OccurrenceRepository occurrences,
-			ScheduleGenerator generator, Clock clock) {
+			ScheduleGenerator generator, FeatureFlags flags, Clock clock) {
 		this.households = households;
 		this.tasks = tasks;
 		this.occurrences = occurrences;
 		this.generator = generator;
+		this.flags = flags;
 		this.clock = clock;
 	}
 
@@ -91,6 +95,44 @@ public class ScheduleService {
 		log.info("User {} changed occurrence {} from {} to {}", userId, occurrenceId, previous, status);
 		return occurrences.findScheduled(household.getId(), occurrenceId)
 			.map(row -> OccurrenceResponse.from(row, today(household)))
+			.orElseThrow(OccurrenceNotFoundException::new);
+	}
+
+	/**
+	 * Moves one pending occurrence to another day, from the household's today up to 2 years ahead,
+	 * as far as the schedule can be viewed (BILLIAMVT-27). Beyond the generated weeks is fine:
+	 * generation keys on the original date, so the moved day is never duplicated. The task's rule doesn't change: its other days stay put,
+	 * and editing, pausing or regenerating the task keeps the move (deleteReplaceable skips moved
+	 * days). Moving it back to its original date makes it a normal day again. The same task may
+	 * already be on the new day (e.g. a daily task); both show.
+	 */
+	@Transactional
+	public OccurrenceResponse move(long userId, long occurrenceId, LocalDate date) {
+		flags.requireDragDrop();
+		Household household = households.householdOf(userId);
+		Occurrence occurrence = occurrences.findByIdAndHouseholdId(occurrenceId, household.getId())
+			.orElseThrow(OccurrenceNotFoundException::new);
+		if (occurrence.getStatus() != OccurrenceStatus.PENDING) {
+			throw new OccurrenceNotMovableException("Only a day that isn't done or skipped can be moved.");
+		}
+		Task task = tasks.findById(occurrence.getTaskId()).orElseThrow(OccurrenceNotFoundException::new);
+		if (task.isDeleted()) {
+			throw new OccurrenceNotMovableException("This task was deleted, so its days can't be moved.");
+		}
+		LocalDate today = today(household);
+		if (date.isBefore(today)) {
+			throw new InvalidMoveException("Pick today or a later day.");
+		}
+		if (date.isAfter(today.plusYears(MAX_YEARS_AHEAD))) {
+			throw new InvalidMoveException("Pick a day up to 2 years ahead.");
+		}
+		LocalDate previous = occurrence.getScheduledDate();
+		occurrence.moveTo(date);
+		occurrences.flush();
+		log.info("User {} moved occurrence {} of task {} from {} to {}", userId, occurrenceId, task.getId(), previous,
+				date);
+		return occurrences.findScheduled(household.getId(), occurrenceId)
+			.map(row -> OccurrenceResponse.from(row, today))
 			.orElseThrow(OccurrenceNotFoundException::new);
 	}
 

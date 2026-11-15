@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.housework.api.schedule.ScheduleDtos.MoveRequest;
 import com.housework.api.schedule.ScheduleDtos.OccurrenceResponse;
 import com.housework.api.schedule.ScheduleDtos.ScheduleResponse;
 import com.housework.api.schedule.ScheduleDtos.StatusRequest;
@@ -44,6 +45,16 @@ class ScheduleController {
 	OccurrenceResponse changeStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable long id,
 			@Valid @RequestBody StatusRequest request) {
 		return schedule.changeStatus(Long.parseLong(jwt.getSubject()), id, request.status());
+	}
+
+	/**
+	 * Moves one occurrence to another day; returns it (BILLIAMVT-27). 404 while the drag-drop
+	 * flag is off (decision record 0002).
+	 */
+	@PutMapping("/api/occurrences/{id}/date")
+	OccurrenceResponse move(@AuthenticationPrincipal Jwt jwt, @PathVariable long id,
+			@Valid @RequestBody MoveRequest request) {
+		return schedule.move(Long.parseLong(jwt.getSubject()), id, request.date());
 	}
 
 	/** Deletes one occurrence for good (BILLIAMVT-25); the front end confirms first. */

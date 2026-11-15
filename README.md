@@ -82,6 +82,18 @@ The home page shows the household's **week**, Sunday to Saturday, with today mar
 
 Tasks become **occurrences** (one per date) on demand, with no nightly job, since the free Render instance sleeps. Creating a task generates its next 4 weeks (`app.schedule.weeks-ahead`), and `GET /api/schedule?from=YYYY-MM-DD&to=YYYY-MM-DD` generates whatever its range still needs and returns the household's occurrences with task names and an `overdue` flag (pending, before the household's today). Each task records how far it's been generated (`task.generated_through`), so days nobody viewed are still filled in and show as overdue. A request covers at most 6 weeks and at most 2 years ahead. Dates come from `RecurrenceCalculator` (ical4j behind an interface, decision 0003).
 
+**Moving a day** (behind the `drag-drop` flag, BILLIAMVT-27): `PUT /api/occurrences/{id}/date` with `{"date": "YYYY-MM-DD"}` moves one pending occurrence to another day, from the household's today up to 2 years ahead (as far as the week can be viewed). The task's rule doesn't change, and the occurrence keeps its `originalDate`; moving it back there makes it a normal day again. Editing, pausing or resuming the task keeps the move, and deleting the task removes it. Done or skipped days, and a deleted task's days, can't be moved (409). The drag-and-drop screen comes in BILLIAMVT-28.
+
+### Feature flags
+
+Unfinished features are hidden behind release toggles ([decision 0002](docs/decisions/0002-feature-flags.md)): `features.*` properties, **off by default**, so production is safe without any setup. The `local` profile and the tests turn them on. `GET /api/features` (no login) returns them, e.g. `{"dragDrop": false}`, and the front end loads them once at startup, treating them as off until they arrive or if the request fails. An unreleased endpoint returns 404 while its flag is off.
+
+| Flag | Property / Render env var | Feature |
+|---|---|---|
+| `dragDrop` | `features.drag-drop` / `FEATURES_DRAGDROP` | Moving a day to another day (BILLIAMVT-27, 28) |
+
+To turn one on in production, set its env var to `true` on Render (the app restarts, about a minute). Delete a flag and its off-state code once its feature ships.
+
 ## Database
 
 Postgres 18 (matching production on Neon). Schema changes are [Flyway](https://documentation.red-gate.com/flyway) migrations in `backend/src/main/resources/db/migration/`, applied automatically when the app starts.

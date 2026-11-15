@@ -74,6 +74,14 @@ public record FeatureProperties(boolean dragDrop, boolean taskDependencies) {}
 - Flags need to change often enough that restarts become annoying.
 - The number of flags grows to more than a handful, which would suggest they're being used for more than release toggles.
 
+## Implementation notes (BILLIAMVT-27, 2026-11-15)
+
+Built as planned, in the `feature` package, with three differences:
+
+- **Only `dragDrop` exists.** `taskDependencies` from the example above will be added if that story (BILLIAMVT-29) is taken on.
+- **The front end doesn't wait for the flags.** `FeatureFlagsService` starts loading them at startup and treats every flag as off until they arrive, or if the request fails. Blocking the first page on `GET /api/features` would show a blank screen for up to a minute while the free Render instance wakes up.
+- **`GET /api/features` needs no login**, so it can be read before signing in. It says nothing about any user.
+
 ## Sources
 
 - [Spring Boot reference: externalized configuration and relaxed binding](https://docs.spring.io/spring-boot/reference/features/external-config.html)

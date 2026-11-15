@@ -45,6 +45,8 @@ class SecurityConfig {
 			.authorizeHttpRequests(requests -> requests
 				.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+				// Feature flags (decision record 0002): read before login, say nothing about any user
+				.requestMatchers(HttpMethod.GET, "/api/features").permitAll()
 				// Lets error responses (e.g. validation failures) through instead of turning them into 401s
 				.requestMatchers("/error").permitAll()
 				.anyRequest().authenticated())
