@@ -1,26 +1,30 @@
 <h2>Settings</h2>
 
-<section>
-  <h3>Household</h3>
+<section class="card" aria-labelledby="household-title">
+  <h3 id="household-title">Household</h3>
   @if (household(); as current) {
     @if (renaming()) {
-      <form [formGroup]="renameForm" (ngSubmit)="saveName()" novalidate>
-        <label for="household-name">Household name</label>
-        <input id="household-name" type="text" formControlName="name" autocomplete="off" />
+      <form class="rename" [formGroup]="renameForm" (ngSubmit)="saveName()" novalidate>
+        <div class="field">
+          <label for="household-name">Household name</label>
+          <input id="household-name" type="text" formControlName="name" autocomplete="off" />
+        </div>
         <p class="actions">
-          <button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save' }}</button>
+          <button type="submit" class="primary" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save' }}</button>
           <button type="button" (click)="cancelRename()" [disabled]="saving()">Cancel</button>
         </p>
       </form>
     } @else {
-      <p class="setting">
-        <span>{{ current.name }}</span>
+      <p class="actions setting">
+        <span class="name">{{ current.name }}</span>
         <button type="button" (click)="startRename(current)">Rename</button>
       </p>
     }
     @if (renameError()) {
       <p class="form-error" role="alert">{{ renameError() }}</p>
     }
+    <!-- Members, the invite code and joining another household (moved from home, BILLIAMVT-49) -->
+    <app-household-card place="settings" (changed)="reloadHousehold()" />
   } @else if (householdLoaded()) {
     <p>You don't belong to a household yet. <a routerLink="/">Set one up</a></p>
   } @else {
@@ -28,8 +32,8 @@
   }
 </section>
 
-<section>
-  <h3>Account</h3>
+<section class="card" aria-labelledby="account-title">
+  <h3 id="account-title">Account</h3>
   @if (auth.user(); as user) {
     <dl>
       <dt>Name</dt>
@@ -45,18 +49,25 @@
     @if (confirming()) {
       <p class="warning">{{ consequence(household()) }}</p>
       <form [formGroup]="form" (ngSubmit)="delete()" novalidate>
-        <label for="delete-password">Enter your password to confirm</label>
-        <input id="delete-password" type="password" formControlName="password" autocomplete="current-password" />
+        <div class="field">
+          <label for="delete-password">Enter your password to confirm</label>
+          <input id="delete-password" type="password" formControlName="password" autocomplete="current-password" />
+        </div>
         <p class="actions">
-          <button type="submit" [disabled]="deleting()">{{ deleting() ? 'Deleting…' : 'Permanently delete my account' }}</button>
+          <button type="submit" class="danger" [disabled]="deleting()">{{ deleting() ? 'Deleting…' : 'Permanently delete my account' }}</button>
           <button type="button" (click)="cancel()" [disabled]="deleting()">Cancel</button>
         </p>
       </form>
     } @else {
-      <button type="button" (click)="confirming.set(true)">Delete my account…</button>
+      <button type="button" (click)="confirming.set(true)">Delete my account</button>
     }
     @if (error()) {
       <p class="form-error" role="alert">{{ error() }}</p>
     }
   </div>
+</section>
+
+<section class="card" aria-labelledby="server-title">
+  <h3 id="server-title">Server status</h3>
+  <app-server-status />
 </section>

@@ -19,8 +19,9 @@
     } @else {
       <ol class="days" [class.refreshing]="loading()">
         @for (day of days(); track day.date) {
-          <li class="day" [class.today]="day.isToday">
-            <h3>
+          <li class="day" [attr.data-date]="day.date" [class.today]="day.isToday" [class.empty-day]="day.occurrences.length === 0">
+            <!-- Focusable from code only: where focus goes when a row is deleted -->
+            <h3 tabindex="-1">
               {{ day.label }}
               @if (day.isToday) {
                 <span class="today-label">Today</span>
@@ -37,54 +38,69 @@
                     [class.deleted]="occurrence.taskDeleted"
                     [attr.data-status]="occurrence.status"
                   >
-                    <div class="details">
-                      <span class="name">{{ occurrence.taskName }}</span>
-                      @if (minutes(occurrence); as text) {
-                        <span class="minutes">{{ text }}</span>
-                      }
-                      @if (occurrence.overdue) {
-                        <span class="overdue-label">Overdue</span>
-                      }
-                      @if (occurrence.status === 'DONE') {
-                        <span class="status-label">✓ Done by {{ occurrence.completedByName ?? 'a former member' }}</span>
-                      } @else if (occurrence.status === 'SKIPPED') {
-                        <span class="status-label">Skipped by {{ occurrence.completedByName ?? 'a former member' }}</span>
-                      }
-                    </div>
-                    @if (choosingDelete() === occurrence.id) {
-                      <div class="actions delete-choice" role="group" [attr.aria-label]="'Remove ' + occurrence.taskName">
-                        <button
-                          type="button"
-                          [disabled]="saving().has(occurrence.id)"
-                          (click)="backToBacklog(occurrence)"
-                        >
-                          Back to backlog
-                        </button>
-                        <button
-                          type="button"
-                          class="delete"
-                          [disabled]="saving().has(occurrence.id)"
-                          (click)="deleteItem(occurrence)"
-                        >
-                          Delete for good
-                        </button>
-                        <button type="button" [disabled]="saving().has(occurrence.id)" (click)="cancelDelete()">
-                          Cancel
-                        </button>
+                    <!-- A checklist row (BILLIAMVT-49): the circle marks it done or undoes it; the rest is under ⋯ -->
+                    <div class="row">
+                      <button
+                        type="button"
+                        class="check"
+                        [attr.aria-label]="(occurrence.status === 'PENDING' ? 'Mark ' + occurrence.taskName + ' done, ' : 'Undo ' + occurrence.taskName + ', ') + day.label"
+                        [disabled]="saving().has(occurrence.id)"
+                        (click)="toggleDone(occurrence)"
+                      >
+                        <span class="circle" aria-hidden="true">{{ occurrence.status === 'DONE' ? '✓' : occurrence.status === 'SKIPPED' ? '–' : '' }}</span>
+                      </button>
+                      <div class="details">
+                        <span class="name">{{ occurrence.taskName }}</span>
+                        @if (occurrence.overdue) {
+                          <span class="overdue-label">Overdue</span>
+                        }
+                        <span class="meta">
+                          @if (occurrence.status === 'DONE') {
+                            Done by {{ occurrence.completedByName ?? 'a former member' }}
+                          } @else if (occurrence.status === 'SKIPPED') {
+                            Skipped by {{ occurrence.completedByName ?? 'a former member' }}
+                          }
+                          @if (minutes(occurrence); as text) {
+                            <span class="minutes">{{ text }}</span>
+                          }
+                        </span>
                       </div>
-                    } @else {
-                      <div class="actions">
-                        @if (occurrence.status === 'PENDING') {
+                      <button
+                        type="button"
+                        class="more quiet"
+                        [attr.data-more]="occurrence.id"
+                        [attr.aria-label]="'More for ' + occurrence.taskName + ' on ' + day.label"
+                        [attr.aria-expanded]="menuOpen() === occurrence.id"
+                        [disabled]="saving().has(occurrence.id)"
+                        (click)="toggleMenu(occurrence)"
+                      >
+                        <span aria-hidden="true">⋯</span>
+                      </button>
+                    </div>
+                    @if (menuOpen() === occurrence.id) {
+                      <!-- The less common actions, floating under ⋯. Safe ones act at once; Delete asks first, in an action sheet.
+                           Each spoken name starts with the visible text, for voice control (WCAG 2.5.3) -->
+                      <div class="menu popover-menu" [attr.aria-label]="'Actions for ' + occurrence.taskName" role="group">
+                        @if (occurrence.oneOff) {
                           <button
                             type="button"
-                            [attr.aria-label]="'Mark ' + occurrence.taskName + ' done'"
+                            [attr.aria-label]="'Back to backlog: ' + occurrence.taskName"
                             [disabled]="saving().has(occurrence.id)"
-                            (click)="setStatus(occurrence, 'DONE')"
+                            (click)="backToBacklog(occurrence)"
                           >
-                            Done
+                            Back to backlog
                           </button>
-                          <!-- Skipping a one-off item would only send it back to the backlog: Remove does that -->
-                          @if (!occurrence.oneOff) {
+                          <button
+                            type="button"
+                            class="destructive"
+                            [attr.aria-label]="'Delete: ' + occurrence.taskName"
+                            [disabled]="saving().has(occurrence.id)"
+                            (click)="delete(occurrence)"
+                          >
+                            Delete
+                          </button>
+                        } @else {
+                          @if (occurrence.status === 'PENDING') {
                             <button
                               type="button"
                               [attr.aria-label]="'Skip ' + occurrence.taskName"
@@ -94,25 +110,16 @@
                               Skip
                             </button>
                           }
-                        } @else {
                           <button
                             type="button"
-                            [attr.aria-label]="'Undo ' + occurrence.taskName"
+                            class="destructive"
+                            [attr.aria-label]="'Delete: ' + occurrence.taskName + ', ' + day.label"
                             [disabled]="saving().has(occurrence.id)"
-                            (click)="setStatus(occurrence, 'PENDING')"
+                            (click)="delete(occurrence)"
                           >
-                            Undo
+                            Delete
                           </button>
                         }
-                        <button
-                          type="button"
-                          class="delete"
-                          [attr.aria-label]="(occurrence.oneOff ? 'Remove ' : 'Delete ') + occurrence.taskName + ' on ' + day.label"
-                          [disabled]="saving().has(occurrence.id)"
-                          (click)="delete(occurrence)"
-                        >
-                          {{ occurrence.oneOff ? 'Remove' : 'Delete' }}
-                        </button>
                       </div>
                     }
                     @if (itemErrors().get(occurrence.id); as message) {
@@ -126,5 +133,15 @@
         }
       </ol>
     }
+
+    <!-- Asks before deleting, the iPhone way (BILLIAMVT-49) -->
+    <app-confirm-sheet
+      [open]="pendingDelete() !== null"
+      [message]="deleteMessage()"
+      [busy]="pendingDelete() !== null && saving().has(pendingDelete()!.id)"
+      [error]="pendingDelete() ? (itemErrors().get(pendingDelete()!.id) ?? null) : null"
+      (confirmed)="confirmDelete()"
+      (cancelled)="cancelDelete()"
+    />
   </section>
 }

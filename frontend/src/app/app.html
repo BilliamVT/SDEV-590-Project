@@ -1,13 +1,14 @@
 <header [class.signed-out]="!auth.user()">
   <h1><a routerLink="/">Housework Scheduler</a></h1>
-  @if (auth.user(); as user) {
-    <div class="account">
-      <span>Signed in as {{ user.displayName }}</span>
-      <a routerLink="/settings">Settings</a>
-      <button type="button" (click)="logout()">Log out</button>
-    </div>
+  @if (auth.user()) {
+    <nav class="account" aria-label="Account">
+      <a class="button quiet" routerLink="/settings">Settings</a>
+      <button type="button" class="quiet" (click)="logout()">Log out</button>
+    </nav>
   }
 </header>
 <main>
   <router-outlet />
 </main>
+<!-- What just changed, for screen readers (BILLIAMVT-49); hidden on screen -->
+<p class="visually-hidden" aria-live="polite">{{ announcer.message() }}</p>

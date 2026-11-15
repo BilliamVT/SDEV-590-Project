@@ -1,24 +1,42 @@
 @if (!noHousehold()) {
   <section class="backlog" aria-labelledby="backlog-title">
-    <h2 id="backlog-title">Backlog</h2>
+    <h2 id="backlog-title" tabindex="-1">Backlog</h2>
     <p class="hint">One-off jobs with no set day. Put one on a day when you're ready.</p>
 
     <form [formGroup]="form" (ngSubmit)="add()" novalidate class="add">
       <div class="field name">
         <label for="backlog-name">One-off item</label>
-        <input id="backlog-name" type="text" formControlName="name" placeholder="e.g. Hang shelves" autocomplete="off" />
+        <input
+          id="backlog-name"
+          type="text"
+          formControlName="name"
+          placeholder="e.g. Hang shelves"
+          autocomplete="off"
+          [attr.aria-invalid]="nameInvalid() || null"
+          [attr.aria-describedby]="nameInvalid() ? 'backlog-name-error' : null"
+        />
       </div>
       <div class="field minutes-field">
-        <label for="backlog-minutes">Minutes <span class="optional">(optional)</span></label>
-        <input id="backlog-minutes" type="number" formControlName="estimatedMinutes" min="1" max="1440" />
+        <!-- One short word, so the label doesn't wrap and push the field down (BILLIAMVT-49) -->
+        <label for="backlog-minutes">Minutes</label>
+        <input
+          id="backlog-minutes"
+          type="number"
+          formControlName="estimatedMinutes"
+          min="1"
+          max="1440"
+          placeholder="Optional"
+          [attr.aria-invalid]="minutesInvalid() || null"
+          [attr.aria-describedby]="minutesInvalid() ? 'backlog-minutes-error' : null"
+        />
       </div>
-      <button type="submit" [disabled]="adding()">Add</button>
+      <button type="submit" class="primary" [disabled]="adding()">Add</button>
     </form>
-    @if (attempted() && (form.controls.name.invalid || form.controls.name.value?.trim() === '')) {
-      <p class="field-error">Enter a name of up to 100 characters.</p>
+    @if (nameInvalid()) {
+      <p class="field-error" id="backlog-name-error">Enter a name of up to 100 characters.</p>
     }
-    @if (attempted() && form.controls.estimatedMinutes.invalid) {
-      <p class="field-error">Enter minutes from 1 to 1440.</p>
+    @if (minutesInvalid()) {
+      <p class="field-error" id="backlog-minutes-error">Enter minutes from 1 to 1440.</p>
     }
     @if (addError()) {
       <p class="form-error" role="alert">{{ addError() }}</p>
@@ -37,52 +55,70 @@
         <ul class="items">
           @for (item of items; track item.id) {
             <li class="item">
-              <div class="details">
-                <span class="name">{{ item.name }}</span>
-                @if (minutes(item); as text) {
-                  <span class="minutes">{{ text }}</span>
-                }
+              <!-- A row like the week view's (BILLIAMVT-49): Schedule is the main action; the rest is under ⋯ -->
+              <div class="row">
+                <div class="details">
+                  <span class="name">{{ item.name }}</span>
+                  @if (minutes(item); as text) {
+                    <span class="minutes">{{ text }}</span>
+                  }
+                </div>
+                <button
+                  type="button"
+                  [attr.aria-label]="'Schedule ' + item.name"
+                  [disabled]="saving().has(item.id)"
+                  (click)="pick(item, 'schedule')"
+                >
+                  Schedule
+                </button>
+                <button
+                  type="button"
+                  class="more quiet"
+                  [attr.data-more]="item.id"
+                  [attr.aria-label]="'More for ' + item.name"
+                  [attr.aria-expanded]="menuOpen() === item.id"
+                  [disabled]="saving().has(item.id)"
+                  (click)="toggleMenu(item)"
+                >
+                  <span aria-hidden="true">⋯</span>
+                </button>
               </div>
               @if (picking()?.id === item.id) {
                 <div class="picker">
-                  <label [for]="'backlog-day-' + item.id">
-                    {{ picking()!.action === 'done' ? 'Done on' : 'Do it on' }}
-                  </label>
-                  <input
-                    [id]="'backlog-day-' + item.id"
-                    type="date"
-                    [value]="picking()!.date"
-                    [attr.min]="picking()!.action === 'schedule' ? today() : null"
-                    [attr.max]="picking()!.action === 'done' ? today() : null"
-                    (input)="setDate($any($event.target).value)"
-                  />
-                  <button type="button" [disabled]="saving().has(item.id)" (click)="confirm(item)">
-                    {{ picking()!.action === 'done' ? 'Mark done' : 'Add to day' }}
-                  </button>
-                  <button type="button" [disabled]="saving().has(item.id)" (click)="cancel()">Cancel</button>
+                  <div class="field">
+                    <label [for]="'backlog-day-' + item.id">
+                      {{ picking()!.action === 'done' ? 'Done on' : 'Do it on' }}
+                    </label>
+                    <input
+                      [id]="'backlog-day-' + item.id"
+                      type="date"
+                      [value]="picking()!.date"
+                      [attr.min]="picking()!.action === 'schedule' ? today() : null"
+                      [attr.max]="picking()!.action === 'done' ? today() : null"
+                      (input)="setDate($any($event.target).value)"
+                    />
+                  </div>
+                  <p class="actions">
+                    <button type="button" class="primary" [disabled]="saving().has(item.id)" (click)="confirm(item)">
+                      {{ picking()!.action === 'done' ? 'Mark done' : 'Add to day' }}
+                    </button>
+                    <button type="button" [disabled]="saving().has(item.id)" (click)="cancel()">Cancel</button>
+                  </p>
                 </div>
-              } @else {
-                <div class="actions">
+              } @else if (menuOpen() === item.id) {
+                <div class="menu popover-menu" [attr.aria-label]="'Actions for ' + item.name" role="group">
                   <button
                     type="button"
-                    [attr.aria-label]="'Mark ' + item.name + ' done'"
+                    [attr.aria-label]="'Mark done: ' + item.name"
                     [disabled]="saving().has(item.id)"
                     (click)="pick(item, 'done')"
                   >
-                    Done
+                    Mark done
                   </button>
                   <button
                     type="button"
-                    [attr.aria-label]="'Schedule ' + item.name"
-                    [disabled]="saving().has(item.id)"
-                    (click)="pick(item, 'schedule')"
-                  >
-                    Schedule
-                  </button>
-                  <button
-                    type="button"
-                    class="delete"
-                    [attr.aria-label]="'Delete ' + item.name"
+                    class="destructive"
+                    [attr.aria-label]="'Delete: ' + item.name"
                     [disabled]="saving().has(item.id)"
                     (click)="delete(item)"
                   >
@@ -98,5 +134,15 @@
         </ul>
       }
     }
+
+    <!-- Asks before deleting, the iPhone way (BILLIAMVT-49) -->
+    <app-confirm-sheet
+      [open]="pendingDelete() !== null"
+      [message]="pendingDelete() ? 'Delete ' + pendingDelete()!.name + '? This can\'t be undone.' : ''"
+      [busy]="pendingDelete() !== null && saving().has(pendingDelete()!.id)"
+      [error]="pendingDelete() ? (itemErrors().get(pendingDelete()!.id) ?? null) : null"
+      (confirmed)="confirmDelete(pendingDelete()!)"
+      (cancelled)="cancelDelete()"
+    />
   </section>
 }

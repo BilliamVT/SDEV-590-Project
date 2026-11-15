@@ -11,6 +11,10 @@ import { BacklogService } from './backlog.service';
 const shelves: BacklogItem = { id: 1, name: 'Hang shelves', estimatedMinutes: 45 };
 const gutters: BacklogItem = { id: 2, name: 'Clean gutters', estimatedMinutes: null };
 
+/** The delete action sheet (BILLIAMVT-49): whether it's open, and what it asks. */
+const sheetOpen = (element: HTMLElement) => element.querySelector('dialog.sheet')!.hasAttribute('open');
+const sheetMessage = (element: HTMLElement) => element.querySelector('dialog.sheet .message')?.textContent?.trim();
+
 describe('Backlog (BILLIAMVT-23)', () => {
   // Wednesday Nov 11, 2026
   beforeEach(() => {
@@ -72,6 +76,17 @@ describe('Backlog (BILLIAMVT-23)', () => {
     return { backlog, fixture, element, placed, names, button, click, set, submit };
   }
 
+  it("shows Schedule on each item, and Mark done and Delete under ⋯ (BILLIAMVT-49)", async () => {
+    const { element, click, button } = await render();
+    expect(button('Schedule Hang shelves')).toBeDefined();
+    expect(element.querySelector('.menu')).toBeNull();
+
+    await click('More for Hang shelves');
+    expect([...element.querySelectorAll('.menu button')].map((b) => b.textContent?.trim())).toEqual(['Mark done', 'Delete']);
+    await click('More for Hang shelves');
+    expect(element.querySelector('.menu')).toBeNull();
+  });
+
   it('lists the items in the order added, with minutes', async () => {
     const { element, names } = await render();
 
@@ -111,7 +126,8 @@ describe('Backlog (BILLIAMVT-23)', () => {
 
   it('marks an item done on today by default, then moves it to the week', async () => {
     const { backlog, element, placed, names, click } = await render();
-    await click('Mark Hang shelves done');
+    await click('More for Hang shelves');
+    await click('Mark done: Hang shelves');
 
     const day = element.querySelector<HTMLInputElement>('#backlog-day-1')!;
     expect(day.value).toBe('2026-11-11');
@@ -128,7 +144,8 @@ describe('Backlog (BILLIAMVT-23)', () => {
   it("starts the day picker on the household's today, not the device's (BILLIAMVT-51)", async () => {
     // The household is a day ahead of this device
     const { backlog, element, click } = await render({ today: () => '2026-11-12' });
-    await click('Mark Hang shelves done');
+    await click('More for Hang shelves');
+    await click('Mark done: Hang shelves');
     const day = () => element.querySelector<HTMLInputElement>('#backlog-day-1')!;
     expect(day().value).toBe('2026-11-12');
     expect(day().max).toBe('2026-11-12');
@@ -143,7 +160,8 @@ describe('Backlog (BILLIAMVT-23)', () => {
 
   it('marks an item done on an earlier day', async () => {
     const { backlog, click, set } = await render();
-    await click('Mark Hang shelves done');
+    await click('More for Hang shelves');
+    await click('Mark done: Hang shelves');
     await set('#backlog-day-1', '2026-11-09');
     await click('Mark done');
 
@@ -186,15 +204,22 @@ describe('Backlog (BILLIAMVT-23)', () => {
     expect(placed).not.toHaveBeenCalled();
   });
 
-  it('deletes an item after confirming', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
-    const { backlog, names, click } = await render();
+  it('deletes an item after confirming in an action sheet, not a browser popup (BILLIAMVT-49)', async () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    const { backlog, element, names, click } = await render();
 
-    await click('Delete Hang shelves');
+    await click('More for Hang shelves');
+    await click('Delete: Hang shelves');
+    expect(confirm).not.toHaveBeenCalled();
+    expect(sheetOpen(element)).toBe(true);
+    expect(sheetMessage(element)).toBe("Delete Hang shelves? This can't be undone.");
+    await click('Cancel');
+    expect(sheetOpen(element)).toBe(false);
     expect(backlog.delete).not.toHaveBeenCalled();
 
-    await click('Delete Hang shelves');
-    expect(confirm).toHaveBeenLastCalledWith('Delete "Hang shelves" from the backlog?');
+    await click('More for Hang shelves');
+    await click('Delete: Hang shelves');
+    await click('Delete');
     expect(backlog.delete).toHaveBeenCalledWith(1);
     expect(names()).toEqual(['Clean gutters']);
   });
@@ -202,7 +227,8 @@ describe('Backlog (BILLIAMVT-23)', () => {
   it('reloads when asked, so a skipped day comes back, and clears the last notice', async () => {
     let items = [shelves, gutters];
     const { fixture, element, names, click } = await render({ list: () => of(items) });
-    await click('Mark Hang shelves done');
+    await click('More for Hang shelves');
+    await click('Mark done: Hang shelves');
     await click('Mark done');
     expect(element.querySelector('.notice')).not.toBeNull();
     items = [shelves, gutters];
@@ -216,7 +242,8 @@ describe('Backlog (BILLIAMVT-23)', () => {
 
   it('clears the last notice when choosing another day', async () => {
     const { element, click } = await render();
-    await click('Mark Hang shelves done');
+    await click('More for Hang shelves');
+    await click('Mark done: Hang shelves');
     await click('Mark done');
     await click('Schedule Clean gutters');
 

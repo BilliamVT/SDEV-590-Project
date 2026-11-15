@@ -6,9 +6,9 @@
 
 <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
   <label for="task-name">Task</label>
-  <input id="task-name" type="text" formControlName="name" placeholder="e.g. Vacuum the living room" autocomplete="off" />
+  <input id="task-name" [attr.aria-invalid]="(attempted() && form.controls.name.invalid) || null" [attr.aria-describedby]="(attempted() && form.controls.name.invalid) ? 'task-name-error' : null" type="text" formControlName="name" placeholder="e.g. Vacuum the living room" autocomplete="off" />
   @if (attempted() && form.controls.name.invalid) {
-    <p class="field-error">Enter a task name of up to 100 characters.</p>
+    <p class="field-error" id="task-name-error">Enter a task name of up to 100 characters.</p>
   }
 
   <label for="task-frequency">Repeats</label>
@@ -20,14 +20,14 @@
 
   @if (intervalLimit(); as limit) {
     <label for="task-interval">Every how many {{ limit.unit }}?</label>
-    <input id="task-interval" type="number" formControlName="interval" min="2" [max]="limit.max" />
+    <input id="task-interval" [attr.aria-invalid]="(attempted() && intervalInvalid()) || null" [attr.aria-describedby]="(attempted() && intervalInvalid()) ? 'task-interval-error' : null" type="number" formControlName="interval" min="2" [max]="limit.max" />
     @if (attempted() && intervalInvalid()) {
-      <p class="field-error">Enter a whole number from 2 to {{ limit.max }}.</p>
+      <p class="field-error" id="task-interval-error">Enter a whole number from 2 to {{ limit.max }}.</p>
     }
   }
 
   @if (needsDay()) {
-    <fieldset id="task-day" class="days">
+    <fieldset id="task-day" [attr.aria-invalid]="(attempted() && daysInvalid()) || null" [attr.aria-describedby]="(attempted() && daysInvalid()) ? 'task-day-error' : null" class="days">
       <legend>On</legend>
       @for (day of days; track day.value) {
         <button
@@ -42,7 +42,7 @@
       }
     </fieldset>
     @if (attempted() && daysInvalid()) {
-      <p class="field-error">Choose at least one day.</p>
+      <p class="field-error" id="task-day-error">Choose at least one day.</p>
     }
   }
 
@@ -58,25 +58,25 @@
 
   @if (needsStartDate()) {
     <label for="task-start">Starting</label>
-    <input id="task-start" type="date" formControlName="startsOn" [min]="minStart()" />
+    <input id="task-start" [attr.aria-invalid]="(attempted() && startInvalid()) || null" [attr.aria-describedby]="(attempted() && startInvalid()) ? 'task-start-error' : null" type="date" formControlName="startsOn" [min]="minStart()" />
     @if (preview(); as text) {
       <p class="preview" aria-live="polite">{{ text }}</p>
     }
     @if (attempted() && startInvalid()) {
-      <p class="field-error">Choose a start date from today on.</p>
+      <p class="field-error" id="task-start-error">Choose a start date from today on.</p>
     }
   }
 
   <label for="task-minutes">Estimated minutes <span class="optional">(optional)</span></label>
-  <input id="task-minutes" type="number" formControlName="estimatedMinutes" min="1" max="1440" />
+  <input id="task-minutes" [attr.aria-invalid]="(attempted() && form.controls.estimatedMinutes.invalid) || null" [attr.aria-describedby]="(attempted() && form.controls.estimatedMinutes.invalid) ? 'task-minutes-error' : null" type="number" formControlName="estimatedMinutes" min="1" max="1440" />
   @if (attempted() && form.controls.estimatedMinutes.invalid) {
-    <p class="field-error">Enter 1 to 1440 minutes, or leave it empty.</p>
+    <p class="field-error" id="task-minutes-error">Enter 1 to 1440 minutes, or leave it empty.</p>
   }
 
   @if (error()) {
     <p class="form-error" role="alert">{{ error() }}</p>
   }
 
-  <button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save task' }}</button>
+  <button type="submit" class="primary" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save task' }}</button>
 </form>
-<p><a [routerLink]="taskId === null ? '/' : '/tasks'">Cancel</a></p>
+<p><a class="button quiet" [routerLink]="taskId === null ? '/' : '/tasks'">Cancel</a></p>

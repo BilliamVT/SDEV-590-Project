@@ -1,0 +1,68 @@
+// A small centred dialog on wide screens; an action sheet at the bottom on phones (below)
+.sheet {
+  width: min(24rem, calc(100% - 2 * var(--space-4)));
+  padding: 0;
+  border: 1px solid var(--color-divider);
+  border-radius: calc(var(--radius) * 1.5);
+  background: var(--color-background);
+  color: var(--color-text);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.3);
+
+  &::backdrop {
+    background: rgb(0 0 0 / 0.45);
+  }
+}
+
+.panel {
+  padding: var(--space-4);
+}
+
+.message {
+  margin: 0 0 var(--space-4);
+}
+
+.form-error {
+  margin: 0 0 var(--space-3);
+}
+
+.buttons {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: var(--space-2);
+}
+
+// Phones: slide up from the bottom, buttons stacked full width, Cancel last, as in iOS
+@media (max-width: 599px) {
+  .sheet {
+    margin: auto auto var(--space-3);
+    animation: slide-up 0.2s ease-out;
+  }
+
+  .message {
+    text-align: center;
+  }
+
+  .buttons {
+    flex-direction: column;
+
+    button {
+      width: 100%;
+    }
+  }
+
+  .cancel {
+    margin-top: var(--space-2);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+}

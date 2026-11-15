@@ -1,47 +1,50 @@
-@if (needsSetup()) {
-  <app-household-setup (ready)="setUp($event)" />
-} @else {
-  <section class="household">
-    <h2>Household</h2>
-    @if (household(); as current) {
-      <p class="name">{{ current.name }}</p>
+@if (place() === 'home') {
+  <!-- Home: only the create-or-join step for a new account, then a pointer to Settings -->
+  @if (needsSetup()) {
+    <app-household-setup (ready)="setUp($event)" />
+  } @else if (justSetUp(); as current) {
+    <p class="notice" role="status">
+      {{ current.name }} is ready. To invite someone, share the code in <a routerLink="/settings">Settings</a>.
+    </p>
+  }
+} @else if (household(); as current) {
+  <!-- Settings: members, the invite code, and joining another household -->
+  <div class="household">
+    <h4>Members</h4>
+    <ul class="members">
+      @for (member of current.members; track member.id) {
+        <li>{{ member.displayName }}</li>
+      }
+    </ul>
 
-      <h3>Members</h3>
-      <ul>
-        @for (member of current.members; track member.id) {
-          <li>{{ member.displayName }}</li>
-        }
-      </ul>
+    <h4>Invite someone</h4>
+    <p class="hint">Share this code so they can join your household. A new code stops the old one working.</p>
+    <p class="actions invite">
+      <code>{{ format(current.inviteCode) }}</code>
+      <button type="button" (click)="copy(current.inviteCode)">{{ copied() ? 'Copied' : 'Copy' }}</button>
+      <button type="button" (click)="regenerate()" [disabled]="busy()">New code</button>
+    </p>
 
-      <h3>Invite someone</h3>
-      <p class="hint">Share this code so they can join your household. A new code stops the old one working.</p>
-      <p class="invite">
-        <code>{{ format(current.inviteCode) }}</code>
-        <button type="button" (click)="copy(current.inviteCode)">{{ copied() ? 'Copied' : 'Copy' }}</button>
-        <button type="button" (click)="regenerate()" [disabled]="busy()">New code</button>
+    <h4>Join another household</h4>
+    @if (confirming()) {
+      <p class="warning">{{ leaveWarning(current) }}</p>
+      <p class="actions">
+        <button type="button" class="danger" (click)="join()" [disabled]="busy()">{{ busy() ? 'Joining…' : 'Leave and join' }}</button>
+        <button type="button" (click)="confirming.set(false)" [disabled]="busy()">Cancel</button>
       </p>
-
-      <h3>Join another household</h3>
-      @if (confirming()) {
-        <p class="warning">{{ leaveWarning(current) }}</p>
-        <p class="actions">
-          <button type="button" (click)="join()" [disabled]="busy()">{{ busy() ? 'Joining…' : 'Leave and join' }}</button>
-          <button type="button" (click)="confirming.set(false)" [disabled]="busy()">Cancel</button>
-        </p>
-      } @else {
-        <form class="join" [formGroup]="joinForm" (ngSubmit)="askToJoin()" novalidate>
+    } @else {
+      <form class="join" [formGroup]="joinForm" (ngSubmit)="askToJoin()" novalidate>
+        <div class="field">
           <label for="invite-code">Invite code</label>
           <input id="invite-code" class="code" type="text" formControlName="code" autocomplete="off" autocapitalize="characters" />
-          <button type="submit">Join</button>
-        </form>
-      }
-      @if (error()) {
-        <p class="form-error" role="alert">{{ error() }}</p>
-      }
-    } @else if (error()) {
-      <p class="form-error" role="alert">{{ error() }}</p>
-    } @else {
-      <p>Loading your household…</p>
+        </div>
+        <button type="submit">Join</button>
+      </form>
     }
-  </section>
+    @if (error()) {
+      <p class="form-error" role="alert">{{ error() }}</p>
+    }
+  </div>
+} @else if (error()) {
+  <p class="form-error" role="alert">{{ error() }}</p>
 }

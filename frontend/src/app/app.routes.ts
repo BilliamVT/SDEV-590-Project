@@ -9,12 +9,12 @@ import { NewTask } from './task/new-task';
 import { TaskList } from './task/task-list';
 
 export const routes: Routes = [
-  { path: '', component: Home, canActivate: [authGuard] },
-  { path: 'settings', component: Settings, canActivate: [authGuard] },
-  { path: 'tasks', component: TaskList, canActivate: [authGuard] },
-  { path: 'tasks/new', component: NewTask, canActivate: [authGuard] },
-  { path: 'tasks/:id/edit', component: NewTask, canActivate: [authGuard] },
-  { path: 'login', component: Login, canActivate: [guestGuard] },
-  { path: 'register', component: Register, canActivate: [guestGuard] },
+  { path: '', title: 'Your week', component: Home, canActivate: [authGuard] },
+  { path: 'settings', title: 'Settings', component: Settings, canActivate: [authGuard] },
+  { path: 'tasks', title: 'Your tasks', component: TaskList, canActivate: [authGuard] },
+  { path: 'tasks/new', title: 'New task', component: NewTask, canActivate: [authGuard] },
+  { path: 'tasks/:id/edit', title: 'Edit task', component: NewTask, canActivate: [authGuard] },
+  { path: 'login', title: 'Log in', component: Login, canActivate: [guestGuard] },
+  { path: 'register', title: 'Create an account', component: Register, canActivate: [guestGuard] },
   { path: '**', redirectTo: '' },
 ];

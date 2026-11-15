@@ -1,5 +1,6 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 
 import { errorMessage } from '../auth/error-message';
 import { Household } from './household.models';
@@ -7,12 +8,12 @@ import { HouseholdSetup } from './household-setup';
 import { HouseholdService, formatInviteCode } from './household.service';
 
 /**
- * The user's household on the home page: members, the invite code, and joining another household.
- * Until the user has one, shows the create-or-join step instead.
+ * The user's household. On the home page, only the create-or-join step for a new account; in
+ * Settings, the members, the invite code, and joining another household (BILLIAMVT-49).
  */
 @Component({
   selector: 'app-household-card',
-  imports: [ReactiveFormsModule, HouseholdSetup],
+  imports: [ReactiveFormsModule, RouterLink, HouseholdSetup],
   templateUrl: './household-card.html',
   styleUrl: './household-card.scss',
 })
@@ -21,6 +22,11 @@ export class HouseholdCard {
 
   /** The user now has a different household (set up or joined): the week and backlog should reload. */
   readonly changed = output<void>();
+  /** Where the card is shown; see the class comment. */
+  readonly place = input<'home' | 'settings'>('home');
+
+  /** The household just created or joined on the home page, for a pointer to Settings. */
+  protected readonly justSetUp = signal<Household | null>(null);
 
   protected readonly household = signal<Household | null>(null);
   protected readonly needsSetup = signal(false);
@@ -45,6 +51,7 @@ export class HouseholdCard {
   protected setUp(household: Household): void {
     this.household.set(household);
     this.needsSetup.set(false);
+    this.justSetUp.set(household);
     this.changed.emit();
   }
 

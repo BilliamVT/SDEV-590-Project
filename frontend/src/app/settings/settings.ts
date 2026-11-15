@@ -4,13 +4,18 @@ import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
 import { errorMessage } from '../auth/error-message';
+import { ServerStatus } from '../health/server-status';
 import { Household } from '../household/household.models';
+import { HouseholdCard } from '../household/household-card';
 import { HouseholdService } from '../household/household.service';
 
-/** Household settings (BILLIAMVT-46) and the user's account, including deleting it (BILLIAMVT-41). */
+/**
+ * Household settings (BILLIAMVT-46: rename; BILLIAMVT-49: members, invite code, joining), the
+ * user's account, including deleting it (BILLIAMVT-41), and the server status.
+ */
 @Component({
   selector: 'app-settings',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [HouseholdCard, ReactiveFormsModule, RouterLink, ServerStatus],
   templateUrl: './settings.html',
   styleUrl: './settings.scss',
 })
@@ -35,6 +40,11 @@ export class Settings {
   protected readonly form = this.formBuilder.group({ password: ['', Validators.required] });
 
   constructor() {
+    this.reloadHousehold();
+  }
+
+  /** After joining another household from the household card, its name shows here. */
+  protected reloadHousehold(): void {
     this.households.load().subscribe({
       next: (household) => {
         this.household.set(household);

@@ -1,9 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, ElementRef, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
 import { errorMessage } from '../auth/error-message';
+import { focusFirstInvalid } from '../shared/focus';
 
 @Component({
   selector: 'app-login',
@@ -12,6 +13,7 @@ import { errorMessage } from '../auth/error-message';
   styleUrl: '../auth/auth-form.scss',
 })
 export class Login {
+  private readonly host = inject(ElementRef<HTMLElement>).nativeElement;
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
@@ -29,6 +31,7 @@ export class Login {
   protected submit(): void {
     this.attempted.set(true);
     if (this.form.invalid) {
+      focusFirstInvalid(this.host);
       return;
     }
     this.submitting.set(true);

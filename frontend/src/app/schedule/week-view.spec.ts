@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { NEVER, Observable, of, throwError } from 'rxjs';
 
 import { BacklogService } from '../backlog/backlog.service';
+import { Announcer } from '../shared/announcer';
 import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
 import { ScheduleService } from './schedule.service';
 import { WeekView } from './week-view';
@@ -31,6 +32,10 @@ const schedule = (from: string, to: string, occurrences: ScheduledOccurrence[] =
   occurrences,
 });
 
+/** The delete action sheet (BILLIAMVT-49): whether it's open, and what it asks. */
+const sheetOpen = (element: HTMLElement) => element.querySelector('dialog.sheet')!.hasAttribute('open');
+const sheetMessage = (element: HTMLElement) => element.querySelector('dialog.sheet .message')?.textContent?.trim();
+
 describe('WeekView', () => {
   // Wednesday Nov 11, 2026: this week runs Sunday Nov 8 to Saturday Nov 14
   beforeEach(() => {
@@ -57,11 +62,13 @@ describe('WeekView', () => {
     const fixture = TestBed.createComponent(WeekView);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
-    const click = async (text: string) => {
-      [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!.click();
+    // A button by its accessible name: its aria-label, or else its text
+    const button = (name: string) =>
+      [...element.querySelectorAll('button')].find((b) => (b.getAttribute('aria-label') ?? b.textContent?.trim()) === name)!;
+    const click = async (name: string) => {
+      button(name).click();
       await fixture.whenStable();
     };
-    const button = (text: string) => [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!;
     return { schedules, backlog, element, click, button, fixture };
   }
 
@@ -166,30 +173,60 @@ describe('WeekView', () => {
   describe('marking done or skipped', () => {
     const vacuum = occurrence(1, 'Vacuum', '2026-11-11');
     const withVacuum = (from: string, to: string) => of(schedule(from, to, [vacuum]));
-    const labelOf = (element: HTMLElement) => element.querySelector('.status-label')?.textContent?.trim();
+    const labelOf = (element: HTMLElement) => element.querySelector('.meta')?.textContent?.trim() || undefined;
+    const more = 'More for Vacuum on Wednesday, Nov 11';
 
     it('marks a task done and shows who did it', async () => {
       const { schedules, element, click } = await render(withVacuum, (id, status) =>
         of({ ...vacuum, status, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' }),
       );
 
-      await click('Done');
+      // The circle, as in a checklist (BILLIAMVT-49)
+      await click('Mark Vacuum done, Wednesday, Nov 11');
 
       expect(schedules.changeStatus).toHaveBeenCalledWith(1, 'DONE');
       expect(element.querySelector('.occurrence')?.getAttribute('data-status')).toBe('DONE');
-      expect(labelOf(element)).toBe('✓ Done by Pat');
-      expect(element.querySelector('button[aria-label="Undo Vacuum"]')).not.toBeNull();
+      expect(labelOf(element)).toBe('Done by Pat');
+      expect(element.querySelector('button[aria-label="Undo Vacuum, Wednesday, Nov 11"]')).not.toBeNull();
+    });
+
+    it('names each circle with its day, so the seven Vacuum circles in a week differ (BILLIAMVT-49)', async () => {
+      const twoDays = [vacuum, occurrence(2, 'Vacuum', '2026-11-12')];
+      const { element } = await render((from, to) => of(schedule(from, to, twoDays)));
+      expect([...element.querySelectorAll('.check')].map((b) => b.getAttribute('aria-label'))).toEqual([
+        'Mark Vacuum done, Wednesday, Nov 11',
+        'Mark Vacuum done, Thursday, Nov 12',
+      ]);
+    });
+
+    it('tells screen readers what changed, and keeps focus on the circle (BILLIAMVT-49)', async () => {
+      const { element, click, button } = await render(withVacuum, (id, status) => of({ ...vacuum, status }));
+      const circle = button('Mark Vacuum done, Wednesday, Nov 11');
+      circle.focus();
+
+      await click('Mark Vacuum done, Wednesday, Nov 11');
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(TestBed.inject(Announcer).message()).toBe('Vacuum marked done');
+      // The same button, now labelled Undo, so focus isn't lost
+      expect(button('Undo Vacuum, Wednesday, Nov 11')).toBe(circle);
+      expect(document.activeElement).toBe(circle);
+      expect(element.querySelector('.occurrence')?.getAttribute('data-status')).toBe('DONE');
     });
 
     it('skips a task', async () => {
-      const { schedules, element, click } = await render(withVacuum, (id, status) =>
+      const { schedules, element, click, button } = await render(withVacuum, (id, status) =>
         of({ ...vacuum, status, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' }),
       );
 
-      await click('Skip');
+      // Skip is under ⋯, which closes again afterwards
+      await click(more);
+      expect(button(more).getAttribute('aria-expanded')).toBe('true');
+      await click('Skip Vacuum');
 
       expect(schedules.changeStatus).toHaveBeenCalledWith(1, 'SKIPPED');
       expect(labelOf(element)).toBe('Skipped by Pat');
+      expect(element.querySelector('.menu')).toBeNull();
     });
 
     it('tells the page when a status changes, so the backlog can reload (BILLIAMVT-23)', async () => {
@@ -197,7 +234,8 @@ describe('WeekView', () => {
       const changed = vi.fn();
       fixture.componentInstance.changed.subscribe(changed);
 
-      await click('Skip');
+      await click(more);
+      await click('Skip Vacuum');
 
       expect(changed).toHaveBeenCalledTimes(1);
     });
@@ -209,20 +247,20 @@ describe('WeekView', () => {
         () => of(vacuum),
       );
 
-      await click('Undo');
+      await click('Undo Vacuum, Wednesday, Nov 11');
 
       expect(schedules.changeStatus).toHaveBeenCalledWith(1, 'PENDING');
       expect(labelOf(element)).toBeUndefined();
-      expect(element.querySelector('button[aria-label="Mark Vacuum done"]')).not.toBeNull();
+      expect(element.querySelector('button[aria-label="Mark Vacuum done, Wednesday, Nov 11"]')).not.toBeNull();
     });
 
     it('disables the buttons while saving', async () => {
       const { element, click, button } = await render(withVacuum);
 
-      await click('Done');
+      await click('Mark Vacuum done, Wednesday, Nov 11');
 
-      expect(button('Done').disabled).toBe(true);
-      expect(button('Skip').disabled).toBe(true);
+      expect(button('Mark Vacuum done, Wednesday, Nov 11').disabled).toBe(true);
+      expect(button(more).disabled).toBe(true);
       expect(element.querySelector('.occurrence')?.getAttribute('data-status')).toBe('PENDING');
     });
 
@@ -231,10 +269,10 @@ describe('WeekView', () => {
         throwError(() => new HttpErrorResponse({ status: 0 })),
       );
 
-      await click('Done');
+      await click('Mark Vacuum done, Wednesday, Nov 11');
 
       expect(element.querySelector('.occurrence .item-error')?.textContent).toContain("couldn't be reached");
-      expect(button('Done').disabled).toBe(false);
+      expect(button('Mark Vacuum done, Wednesday, Nov 11').disabled).toBe(false);
     });
   });
 
@@ -242,27 +280,36 @@ describe('WeekView', () => {
     const vacuum = occurrence(1, 'Vacuum', '2026-11-11', { status: 'DONE', taskDeleted: true, completedByName: 'Pat' });
     const withVacuum = (from: string, to: string) => of(schedule(from, to, [vacuum]));
     afterEach(() => vi.restoreAllMocks());
+    const openDelete = async (click: (name: string) => Promise<void>) => {
+      await click('More for Vacuum on Wednesday, Nov 11');
+      await click('Delete: Vacuum, Wednesday, Nov 11');
+    };
 
-    it('asks first, then removes it from the week', async () => {
-      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-      const { schedules, element, click } = await render(withVacuum);
+    it('asks first in an action sheet, then removes only that day (BILLIAMVT-49)', async () => {
+      const confirm = vi.spyOn(window, 'confirm');
+      const { schedules, element, click, button } = await render(withVacuum);
+
+      await openDelete(click);
+
+      expect(confirm).not.toHaveBeenCalled();
+      expect(schedules.delete).not.toHaveBeenCalled();
+      expect(sheetOpen(element)).toBe(true);
+      expect(sheetMessage(element)).toBe('Delete Vacuum on Wednesday, Nov 11? Its other days stay.');
+      expect(element.querySelector('.menu')).toBeNull();
 
       await click('Delete');
 
-      expect(confirm).toHaveBeenCalledWith(
-        'Delete "Vacuum" on Wednesday, Nov 11 for good? This only removes this day, and it can\'t be undone.',
-      );
       expect(schedules.delete).toHaveBeenCalledWith(1);
       expect(element.querySelector('.occurrence')).toBeNull();
       expect(element.querySelectorAll('.day')[3].querySelector('.empty')?.textContent).toBe('Nothing scheduled');
     });
 
     it('tells the page after deleting, and reloads when asked (BILLIAMVT-23)', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
       const { schedules, fixture, click } = await render(withVacuum);
       const changed = vi.fn();
       fixture.componentInstance.changed.subscribe(changed);
 
+      await openDelete(click);
       await click('Delete');
       expect(changed).toHaveBeenCalledTimes(1);
 
@@ -271,93 +318,165 @@ describe('WeekView', () => {
     });
 
     it('does nothing if the user cancels', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
-      const { schedules, element, click } = await render(withVacuum);
+      const { schedules, element, click, button } = await render(withVacuum);
 
-      await click('Delete');
+      await openDelete(click);
+      await click('Cancel');
 
       expect(schedules.delete).not.toHaveBeenCalled();
-      expect(element.querySelector('.occurrence')).not.toBeNull();
+      expect(sheetOpen(element)).toBe(false);
+      expect(button('Undo Vacuum, Wednesday, Nov 11')).toBeDefined();
     });
 
     it('keeps it and shows an error when deleting fails', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
       const { element, click } = await render(withVacuum, undefined, () =>
         throwError(() => new HttpErrorResponse({ status: 0 })),
       );
 
+      await openDelete(click);
       await click('Delete');
 
       expect(element.querySelector('.occurrence .item-error')?.textContent).toContain("couldn't be reached");
     });
+
+    it('keeps Skip and Delete under ⋯: a done day only offers Delete (BILLIAMVT-49)', async () => {
+      const pending = occurrence(2, 'Dishes', '2026-11-11');
+      const { element, click } = await render((from, to) => of(schedule(from, to, [pending, vacuum])));
+      const menu = () => [...element.querySelectorAll('.menu button')].map((b) => b.textContent?.trim());
+
+      expect(element.querySelector('.menu')).toBeNull();
+      await click('More for Dishes on Wednesday, Nov 11');
+      expect(menu()).toEqual(['Skip', 'Delete']);
+      // Only one menu at a time
+      await click('More for Vacuum on Wednesday, Nov 11');
+      expect(menu()).toEqual(['Delete']);
+      await click('More for Vacuum on Wednesday, Nov 11');
+      expect(element.querySelector('.menu')).toBeNull();
+    });
+
+    it('puts focus back on ⋯ when Escape closes the menu or the action sheet is cancelled (BILLIAMVT-49)', async () => {
+      const { click, button } = await render(withVacuum);
+      const more = 'More for Vacuum on Wednesday, Nov 11';
+
+      await click(more);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.activeElement).toBe(button(more));
+
+      await click(more);
+      await click('Delete: Vacuum, Wednesday, Nov 11');
+      await click('Cancel');
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.activeElement).toBe(button(more));
+    });
+
+    it('after deleting, announces it and focuses the day, since the row is gone (BILLIAMVT-49)', async () => {
+      const { element, click } = await render(withVacuum);
+
+      await click('More for Vacuum on Wednesday, Nov 11');
+      await click('Delete: Vacuum, Wednesday, Nov 11');
+      await click('Delete');
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(TestBed.inject(Announcer).message()).toBe('Vacuum on Wednesday, Nov 11 deleted');
+      expect(document.activeElement).toBe(element.querySelector('[data-date="2026-11-11"] h3'));
+    });
+
+    it('floats the menu over the list, and closes it on a tap elsewhere or Escape (BILLIAMVT-49)', async () => {
+      const { element, fixture, click } = await render(withVacuum);
+      const isOpen = () => element.querySelector('.menu.popover-menu') !== null;
+
+      await click('More for Vacuum on Wednesday, Nov 11');
+      expect(isOpen()).toBe(true);
+      // A tap inside the menu doesn't close it
+      element.querySelector<HTMLElement>('.menu')!.click();
+      await fixture.whenStable();
+      expect(isOpen()).toBe(true);
+
+      element.querySelector<HTMLElement>('h2')!.click();
+      await fixture.whenStable();
+      expect(isOpen()).toBe(false);
+
+      await click('More for Vacuum on Wednesday, Nov 11');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await fixture.whenStable();
+      expect(isOpen()).toBe(false);
+    });
   });
 
-  describe("deleting a one-off item's day (BILLIAMVT-23)", () => {
+  describe("removing a one-off item's day (BILLIAMVT-23)", () => {
     const shelves = occurrence(5, 'Hang shelves', '2026-11-11', { taskId: 9, oneOff: true });
     const withShelves = (from: string, to: string) => of(schedule(from, to, [shelves]));
+    const openMenu = (click: (name: string) => Promise<void>) => click('More for Hang shelves on Wednesday, Nov 11');
     afterEach(() => vi.restoreAllMocks());
 
-    it('has Done and Remove, but no Skip: skipping would only send it back to the backlog', async () => {
-      const { button } = await render(withShelves);
-
-      expect(button('Done')).toBeDefined();
-      expect(button('Skip')).toBeUndefined();
-      expect(button('Delete')).toBeUndefined();
-      expect(button('Remove').getAttribute('aria-label')).toBe('Remove Hang shelves on Wednesday, Nov 11');
-    });
-
-    it('offers back to the backlog or for good, instead of the browser confirmation', async () => {
-      const confirm = vi.spyOn(window, 'confirm');
+    it('offers back to the backlog or delete for good in its menu, but no Skip (BILLIAMVT-49)', async () => {
       const { element, click, button } = await render(withShelves);
 
-      await click('Remove');
-
-      expect(confirm).not.toHaveBeenCalled();
-      expect(element.querySelector('.delete-choice')?.getAttribute('aria-label')).toBe('Remove Hang shelves');
-      expect(button('Back to backlog')).toBeDefined();
-      expect(button('Delete for good')).toBeDefined();
-      expect(button('Done')).toBeUndefined();
-
-      await click('Cancel');
-      expect(element.querySelector('.delete-choice')).toBeNull();
-      expect(button('Done')).toBeDefined();
+      expect(button('Mark Hang shelves done, Wednesday, Nov 11')).toBeDefined();
+      await openMenu(click);
+      expect([...element.querySelectorAll('.menu button')].map((b) => b.textContent?.trim())).toEqual([
+        'Back to backlog',
+        'Delete',
+      ]);
     });
 
-    it('puts it back in the backlog by deleting only the day', async () => {
+    it('puts it back in the backlog at once, without asking: it is easy to reverse', async () => {
+      const confirm = vi.spyOn(window, 'confirm');
       const { schedules, backlog, element, fixture, click } = await render(withShelves);
       const changed = vi.fn();
       fixture.componentInstance.changed.subscribe(changed);
 
-      await click('Remove');
-      await click('Back to backlog');
+      await openMenu(click);
+      await click('Back to backlog: Hang shelves');
 
+      expect(confirm).not.toHaveBeenCalled();
+      expect(sheetOpen(element)).toBe(false);
       expect(schedules.delete).toHaveBeenCalledWith(5);
       expect(backlog.delete).not.toHaveBeenCalled();
       expect(element.querySelector('.occurrence')).toBeNull();
       expect(changed).toHaveBeenCalledTimes(1);
     });
 
+    it('asks in an action sheet before deleting it for good, and can be cancelled', async () => {
+      const { backlog, element, click, button } = await render(withShelves);
+
+      await openMenu(click);
+      await click('Delete: Hang shelves');
+
+      expect(element.querySelector('.menu')).toBeNull();
+      expect(sheetOpen(element)).toBe(true);
+      expect(sheetMessage(element)).toBe("Delete Hang shelves for good? This can't be undone.");
+      await click('Cancel');
+      expect(sheetOpen(element)).toBe(false);
+      expect(backlog.delete).not.toHaveBeenCalled();
+      expect(button('Mark Hang shelves done, Wednesday, Nov 11')).toBeDefined();
+    });
+
     it('deletes the item and its days for good', async () => {
       const { schedules, backlog, element, click } = await render(withShelves);
 
-      await click('Remove');
-      await click('Delete for good');
+      await openMenu(click);
+      await click('Delete: Hang shelves');
+      await click('Delete');
 
       expect(backlog.delete).toHaveBeenCalledWith(9);
       expect(schedules.delete).not.toHaveBeenCalled();
       expect(element.querySelector('.occurrence')).toBeNull();
     });
 
-    it('keeps the choice open and shows an error when it fails', async () => {
+    it('keeps the action sheet open and shows the error in it when it fails', async () => {
       const { element, click } = await render(withShelves, undefined, undefined, () =>
         throwError(() => new HttpErrorResponse({ status: 0 })),
       );
 
-      await click('Remove');
-      await click('Delete for good');
+      await openMenu(click);
+      await click('Delete: Hang shelves');
+      await click('Delete');
 
       expect(element.querySelector('.occurrence .item-error')?.textContent).toContain("couldn't be reached");
-      expect(element.querySelector('.delete-choice')).not.toBeNull();
+      expect(sheetOpen(element)).toBe(true);
+      expect(element.querySelector('dialog.sheet [role="alert"]')?.textContent).toContain("couldn't be reached");
     });
   });
 

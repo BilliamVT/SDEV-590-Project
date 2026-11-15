@@ -5,6 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
+import { HealthService } from '../health/health.service';
 import { Household } from '../household/household.models';
 import { HouseholdService } from '../household/household.service';
 import { Settings } from './settings';
@@ -34,6 +35,7 @@ describe('Settings', () => {
         provideRouter([]),
         { provide: AuthService, useValue: auth },
         { provide: HouseholdService, useValue: households },
+        { provide: HealthService, useValue: { status: () => of('UP') } },
       ],
     }).compileComponents();
     const router = TestBed.inject(Router);
@@ -127,7 +129,7 @@ describe('Settings', () => {
     const { auth, element, click } = await render(household(1));
     expect(element.querySelector('#delete-password')).toBeNull();
 
-    await click('Delete my account…');
+    await click('Delete my account');
 
     expect(element.querySelector('#delete-password')).not.toBeNull();
     expect(auth.deleteAccount).not.toHaveBeenCalled();
@@ -135,20 +137,20 @@ describe('Settings', () => {
 
   it('warns that the household goes too when the user is its only member', async () => {
     const { element, click } = await render(household(1));
-    await click('Delete my account…');
+    await click('Delete my account');
     expect(element.textContent).toContain('433 Flynn Ave, so it and all its tasks will be deleted too');
   });
 
   it('explains that other members keep the household', async () => {
     const { element, click } = await render(household(2));
-    await click('Delete my account…');
+    await click('Delete my account');
     expect(element.textContent).toContain("You'll be removed from 433 Flynn Ave");
     expect(element.textContent).toContain('keep its tasks and history');
   });
 
   it('requires the password', async () => {
     const { auth, element, click } = await render(household(1));
-    await click('Delete my account…');
+    await click('Delete my account');
     await click('Permanently delete my account');
     expect(auth.deleteAccount).not.toHaveBeenCalled();
     expect(element.textContent).toContain('Enter your password to confirm.');
@@ -156,7 +158,7 @@ describe('Settings', () => {
 
   it('deletes the account and goes to the login page with a notice', async () => {
     const { auth, router, click, typePassword } = await render(household(1));
-    await click('Delete my account…');
+    await click('Delete my account');
     typePassword('correct-horse');
     await click('Permanently delete my account');
 
@@ -167,7 +169,7 @@ describe('Settings', () => {
   it('shows the error for a wrong password and stays on the page', async () => {
     const forbidden = new HttpErrorResponse({ status: 403, error: { detail: 'Password is incorrect' } });
     const { router, element, click, typePassword } = await render(household(1), () => throwError(() => forbidden));
-    await click('Delete my account…');
+    await click('Delete my account');
     typePassword('wrong');
     await click('Permanently delete my account');
 
@@ -177,9 +179,17 @@ describe('Settings', () => {
 
   it('cancelling closes the confirmation', async () => {
     const { auth, element, click } = await render(household(1));
-    await click('Delete my account…');
+    await click('Delete my account');
     await click('Cancel');
     expect(element.querySelector('#delete-password')).toBeNull();
     expect(auth.deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('shows the members, the invite code and the server status, moved from the home page (BILLIAMVT-49)', async () => {
+    const { element } = await render(household(2));
+    expect([...element.querySelectorAll('.members li')].map((li) => li.textContent)).toEqual(['Member 1', 'Member 2']);
+    expect(element.querySelector('.invite code')?.textContent).toBe('K7QM-3XRP');
+    expect(element.querySelector('#invite-code')).not.toBeNull();
+    expect(element.textContent).toContain('The server and database are running.');
   });
 });

@@ -7,9 +7,9 @@
   </p>
 }
 
-<p class="home-actions">
-  <a class="primary-action" routerLink="/tasks/new">Add a task</a>
-  <a routerLink="/tasks">Your tasks</a>
+<p class="actions home-actions">
+  <a class="button primary" routerLink="/tasks/new">Add a task</a>
+  <a class="button" routerLink="/tasks">Your tasks</a>
 </p>
 
 <!-- Each reloads the other: putting an item on a day, or skipping or deleting one, moves it between them -->
@@ -17,23 +17,5 @@
 
 <app-backlog #backlog (placed)="week.reload()" />
 
-<!-- A new or different household: the week and backlog load again -->
-<app-household-card (changed)="week.reload(); backlog.reload()" />
-
-<section class="status" [attr.data-state]="state()">
-  <h2>Server status</h2>
-  @switch (state()) {
-    @case ('checking') {
-      <p>Checking the server… The server sleeps when it isn't in use, so the first check can take up to a minute.</p>
-    }
-    @case ('up') {
-      <p>The server and database are running.</p>
-    }
-    @case ('down') {
-      <p>The server is running but reports a problem (status: {{ reportedStatus() }}).</p>
-    }
-    @case ('unreachable') {
-      <p>The server couldn't be reached. Try again in a minute.</p>
-    }
-  }
-</section>
+<!-- Only for a new account: create or join a household. The household's details are in Settings. -->
+<app-household-card place="home" (changed)="week.reload(); backlog.reload()" />
