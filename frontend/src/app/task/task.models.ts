@@ -32,4 +32,12 @@ export interface Task {
   startsOn: string;
   estimatedMinutes: number | null;
   active: boolean;
+  /** The latest day it was done, and by whom (BILLIAMVT-26); null if never done */
+  lastDone: LastDone | null;
+}
+
+export interface LastDone {
+  date: string;
+  /** Null when that member has since deleted their account */
+  byName: string | null;
 }

@@ -18,6 +18,7 @@ const task = (id: number, name: string, extra: Partial<Task> = {}): Task => ({
   startsOn: '2026-11-11',
   estimatedMinutes: null,
   active: true,
+  lastDone: null,
   ...extra,
 });
 
@@ -70,6 +71,26 @@ describe('TaskList', () => {
     await click('Dishes', 'Resume');
     expect(service.resume).toHaveBeenCalledWith(1);
     expect(row('Dishes').querySelector('.badge')).toBeNull();
+  });
+
+  it('says when each task was last done and by whom (BILLIAMVT-26)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 15, 12));
+    try {
+      const { row } = await render([
+        task(1, 'Dishes', { lastDone: { date: '2026-11-12', byName: 'Sam' } }),
+        task(2, 'Gutters', { lastDone: { date: '2025-08-30', byName: null } }),
+        task(3, 'Windows'),
+      ]);
+      const line = (name: string) => row(name).querySelector('.last-done')?.textContent?.trim();
+
+      expect(line('Dishes')).toBe('Last done Thu, Nov 12 by Sam');
+      // Another year shows the year; a deleted account is "a former member"
+      expect(line('Gutters')).toBe('Last done Sat, Aug 30, 2025 by a former member');
+      expect(line('Windows')).toBe('Not done yet');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('asks before deleting', async () => {

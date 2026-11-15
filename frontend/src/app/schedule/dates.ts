@@ -42,6 +42,17 @@ export function weekLabel(from: string, to: string): string {
   return `${startText} – ${endText}`;
 }
 
+/** "Thu, Nov 12", with the year when it isn't this year: "Thu, Nov 12, 2025" (BILLIAMVT-26) */
+export function shortDayLabel(iso: string, now: Date = new Date()): string {
+  const date = fromIsoDate(iso);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
+}
+
 /** "Wednesday, Nov 11" */
 export function dayLabel(iso: string): string {
   return fromIsoDate(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });

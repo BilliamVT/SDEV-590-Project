@@ -6,6 +6,7 @@ import { errorMessage } from '../auth/error-message';
 import { Announcer } from '../shared/announcer';
 import { ConfirmSheet } from '../shared/confirm-sheet';
 import { focusLater } from '../shared/focus';
+import { shortDayLabel } from '../schedule/dates';
 import { Task } from './task.models';
 import { TaskService } from './task.service';
 
@@ -42,6 +43,15 @@ export class TaskList {
 
   protected minutes(task: Task): string | null {
     return task.estimatedMinutes ? `${task.estimatedMinutes} min` : null;
+  }
+
+  /** "Last done Thu, Nov 12 by Sam", or "Not done yet" (BILLIAMVT-26) */
+  protected lastDone(task: Task): string {
+    const last = task.lastDone;
+    if (!last) {
+      return 'Not done yet';
+    }
+    return `Last done ${shortDayLabel(last.date)} by ${last.byName ?? 'a former member'}`;
   }
 
   protected togglePause(task: Task): void {

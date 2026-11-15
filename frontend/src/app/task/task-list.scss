@@ -33,7 +33,8 @@
   font-weight: 600;
 }
 
-.schedule {
+.schedule,
+.last-done {
   flex-basis: 100%;
   color: var(--color-text-muted);
   font-size: var(--text-sm);

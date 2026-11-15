@@ -15,6 +15,19 @@ test('editing, pausing, resuming and deleting a task changes the week', async ({
   const week = async () => page.getByRole('link', { name: 'Back to the week' }).click();
   const row = (p: Page, name: string) => p.getByRole('listitem').filter({ hasText: name });
 
+  // Your tasks says when each task was last done, and by whom (BILLIAMVT-26)
+  await tasksPage();
+  await expect(row(page, 'Dishes')).toContainText('Not done yet');
+  await week();
+  await today(page).getByRole('button', { name: /^Mark Dishes done/ }).click();
+  await expect(today(page).getByText('Done by Pat')).toBeVisible();
+  await tasksPage();
+  await expect(row(page, 'Dishes')).toContainText(/Last done \w{3}, \w{3} \d{1,2} by Pat/);
+  // Undone again, so pausing below clears today (a done day stays as history)
+  await week();
+  await today(page).getByRole('button', { name: /^Undo Dishes/ }).click();
+  await expect(today(page).getByRole('button', { name: /^Mark Dishes done/ })).toBeVisible();
+
   // Editing the name renames today's occurrence too
   await tasksPage();
   await row(page, 'Dishes').getByRole('link', { name: 'Edit' }).click();

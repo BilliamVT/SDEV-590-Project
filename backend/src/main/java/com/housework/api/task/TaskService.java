@@ -7,8 +7,10 @@ import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,8 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.housework.api.household.Household;
 import com.housework.api.household.HouseholdService;
+import com.housework.api.schedule.OccurrenceRepository;
 import com.housework.api.schedule.ScheduleGenerator;
 import com.housework.api.task.TaskDtos.CreateTaskRequest;
+import com.housework.api.task.TaskDtos.LastDone;
 import com.housework.api.task.TaskDtos.TaskResponse;
 
 /**
@@ -43,12 +47,16 @@ public class TaskService {
 
 	private final ScheduleGenerator schedule;
 
+	private final OccurrenceRepository occurrences;
+
 	private final Clock clock;
 
-	TaskService(TaskRepository tasks, HouseholdService households, ScheduleGenerator schedule, Clock clock) {
+	TaskService(TaskRepository tasks, HouseholdService households, ScheduleGenerator schedule,
+			OccurrenceRepository occurrences, Clock clock) {
 		this.tasks = tasks;
 		this.households = households;
 		this.schedule = schedule;
+		this.occurrences = occurrences;
 		this.clock = clock;
 	}
 
@@ -62,22 +70,21 @@ public class TaskService {
 		log.info("User {} created task {} in household {}", userId, task.getId(), household.getId());
 		// Ready before anyone opens the schedule (BILLIAMVT-38)
 		this.schedule.generateAhead(task, today);
-		return TaskResponse.from(task);
+		return respond(task);
 	}
 
 	/** The household's tasks by name, paused ones included; deleted ones aren't (BILLIAMVT-22). */
 	@Transactional(readOnly = true)
 	public List<TaskResponse> list(long userId) {
 		Household household = households.householdOf(userId);
-		return tasks.findRecurring(household.getId())
-			.stream()
-			.map(TaskResponse::from)
-			.toList();
+		List<Task> found = tasks.findRecurring(household.getId());
+		Map<Long, LastDone> lastDone = lastDone(found.stream().map(Task::getId).toList());
+		return found.stream().map((task) -> TaskResponse.from(task, lastDone.get(task.getId()))).toList();
 	}
 
 	@Transactional(readOnly = true)
 	public TaskResponse get(long userId, long taskId) {
-		return TaskResponse.from(task(households.householdOf(userId), taskId));
+		return respond(task(households.householdOf(userId), taskId));
 	}
 
 	/**
@@ -96,7 +103,7 @@ public class TaskService {
 			this.schedule.regenerate(task, today);
 		}
 		log.info("User {} edited task {}", userId, task.getId());
-		return TaskResponse.from(task);
+		return respond(task);
 	}
 
 	/** Paused tasks get no new occurrences; their future pending ones are removed. */
@@ -107,7 +114,7 @@ public class TaskService {
 		task.pause();
 		schedule.regenerate(task, today(household));
 		log.info("User {} paused task {}", userId, task.getId());
-		return TaskResponse.from(task);
+		return respond(task);
 	}
 
 	/** Back on its original rule and start date, from today on; the paused days aren't filled in. */
@@ -118,7 +125,7 @@ public class TaskService {
 		task.resume();
 		schedule.resume(task, today(household));
 		log.info("User {} resumed task {}", userId, task.getId());
-		return TaskResponse.from(task);
+		return respond(task);
 	}
 
 	/** Soft delete: past occurrences stay as history; upcoming pending ones are removed. */
@@ -191,6 +198,23 @@ public class TaskService {
 			throw new InvalidScheduleException("Choose a start date within a year of today.");
 		}
 		return chosen;
+	}
+
+
+	/** A task with when it was last done, so a paused or edited task keeps its "Last done" line. */
+	private TaskResponse respond(Task task) {
+		return TaskResponse.from(task, lastDone(List.of(task.getId())).get(task.getId()));
+	}
+
+	/** When each task was last done and by whom (BILLIAMVT-26); tasks never done are left out. */
+	private Map<Long, LastDone> lastDone(List<Long> taskIds) {
+		if (taskIds.isEmpty()) {
+			return Map.of();
+		}
+		return occurrences.findLastDone(taskIds)
+			.stream()
+			.collect(Collectors.toMap(OccurrenceRepository.LastDoneRow::getTaskId,
+					(row) -> new LastDone(row.getDate(), row.getByName())));
 	}
 
 }
