@@ -58,6 +58,35 @@ class TaskManagementTests {
 	}
 
 	@Test
+	void eachTaskSaysWhenItWasLastDoneAndByWhom() {
+		String token = registerWithHousehold("pat@example.com");
+		long pat = jdbc.sql("select id from app_user where email = 'pat@example.com'").query(Long.class).single();
+		long dishes = createTask(token, "{\"name\": \"Dishes\", \"frequency\": \"DAILY\"}");
+		long gutters = createTask(token, "{\"name\": \"Gutters\", \"frequency\": \"QUARTERLY\"}");
+		createTask(token, "{\"name\": \"Vacuum\", \"frequency\": \"WEEKLY\", \"daysOfWeek\": [\"SATURDAY\"]}");
+		// Dishes: done 5 and 3 days ago, then skipped yesterday (a skip isn't "done")
+		markPast(dishes, today.minusDays(5), "DONE", pat);
+		markPast(dishes, today.minusDays(3), "DONE", pat);
+		markPast(dishes, today.minusDays(1), "SKIPPED", pat);
+		// Gutters: done by someone who has since deleted their account
+		markPast(gutters, today.minusMonths(2), "DONE", null);
+
+		MvcTestResult result = send(token, "GET", "/api/tasks");
+
+		assertThat(JsonPath.<List<String>>read(body(result), "$[*].name")).containsExactly("Dishes", "Gutters", "Vacuum");
+		assertThat(text(result, "$[0].lastDone.date")).isEqualTo(today.minusDays(3).toString());
+		assertThat(text(result, "$[0].lastDone.byName")).isEqualTo("Pat");
+		assertThat(text(result, "$[1].lastDone.date")).isEqualTo(today.minusMonths(2).toString());
+		assertThat(JsonPath.<Object>read(body(result), "$[1].lastDone.byName")).isNull();
+		// Never done
+		assertThat(JsonPath.<Object>read(body(result), "$[2].lastDone")).isNull();
+
+		// Pausing returns the task with its line, so the list keeps it
+		MvcTestResult paused = send(token, "POST", "/api/tasks/" + dishes + "/pause");
+		assertThat(text(paused, "$.lastDone.date")).isEqualTo(today.minusDays(3).toString());
+	}
+
+	@Test
 	void oneTaskIncludesItsMenuFieldsForTheEditForm() {
 		String token = registerWithHousehold("pat@example.com");
 		long id = createTask(token, """
@@ -205,6 +234,16 @@ class TaskManagementTests {
 	void managingTasksRequiresLogin() {
 		assertThat(mvc.get().uri("/api/tasks")).hasStatus(401);
 		assertThat(mvc.delete().uri("/api/tasks/1")).hasStatus(401);
+	}
+
+	/** A past day of the task, already done or skipped; {@code by} null is a deleted member. */
+	private void markPast(long taskId, LocalDate date, String status, Long by) {
+		entityManager.flush();
+		jdbc.sql("""
+				insert into occurrence (task_id, original_date, scheduled_date, status, completed_by, completed_at)
+				values (?, ?, ?, ?, ?, now())""")
+			.params(taskId, date, date, status, by)
+			.update();
 	}
 
 	private List<LocalDate> dates(long taskId) {

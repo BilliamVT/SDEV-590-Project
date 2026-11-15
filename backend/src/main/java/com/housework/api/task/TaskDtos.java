@@ -39,16 +39,24 @@ public final class TaskDtos {
 	/** Includes the menu fields the rule was built from, so the edit form can be filled in. */
 	public record TaskResponse(Long id, String name, String recurrenceRule, String schedule, Frequency frequency,
 			Integer interval, List<DayOfWeek> daysOfWeek, Integer dayOfMonth, LocalDate startsOn, Integer estimatedMinutes,
-			boolean active) {
+			boolean active, LastDone lastDone) {
 
-		static TaskResponse from(Task task) {
+		/** {@code lastDone} is null if the task has never been done. */
+		static TaskResponse from(Task task, LastDone lastDone) {
 			RecurrenceRules.MenuChoice choice = RecurrenceRules.parse(task.getRecurrenceRule());
 			return new TaskResponse(task.getId(), task.getName(), task.getRecurrenceRule(),
 					RecurrenceRules.describe(task.getRecurrenceRule()), choice.frequency(), choice.interval(),
 					choice.daysOfWeek(), choice.dayOfMonth(), task.getStartsOn(), task.getEstimatedMinutes(),
-					task.isActive());
+					task.isActive(), lastDone);
 		}
 
+	}
+
+	/**
+	 * The latest day the task was done, and by whom (BILLIAMVT-26). {@code byName} is null when
+	 * that member has since deleted their account.
+	 */
+	public record LastDone(LocalDate date, String byName) {
 	}
 
 }

@@ -29,6 +29,7 @@ describe('NewTask (editing)', () => {
     startsOn: '2026-11-02',
     estimatedMinutes: 5,
     active: true,
+    lastDone: null,
   };
 
   async function render(task: Task = existing) {

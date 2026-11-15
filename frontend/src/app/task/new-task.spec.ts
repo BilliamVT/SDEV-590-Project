@@ -23,6 +23,7 @@ const savedTask = (request: CreateTaskRequest): Task => ({
   startsOn: '2026-11-04',
   estimatedMinutes: request.estimatedMinutes ?? null,
   active: true,
+  lastDone: null,
 });
 
 describe('NewTask', () => {

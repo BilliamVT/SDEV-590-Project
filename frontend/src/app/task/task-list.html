@@ -31,6 +31,8 @@
                 · {{ text }}
               }
             </span>
+            <!-- When it was last done and by whom; the week view has each day's detail (BILLIAMVT-26) -->
+            <span class="last-done">{{ lastDone(task) }}</span>
           </div>
           <!-- One set of buttons, Edit included (BILLIAMVT-49) -->
           <p class="row-actions">

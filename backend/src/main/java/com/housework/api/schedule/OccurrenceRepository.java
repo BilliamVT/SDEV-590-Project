@@ -2,6 +2,7 @@ package com.housework.api.schedule;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,6 +53,29 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 			where task_id = :taskId and status = 'PENDING'
 			  and (original_date >= :from or scheduled_date >= :from)""", nativeQuery = true)
 	int deleteUpcoming(@Param("taskId") long taskId, @Param("from") LocalDate from);
+
+	/**
+	 * When each task was last done and by whom (BILLIAMVT-26): its latest done day, by date.
+	 * Skipped days don't count. {@code byName} is null when that member's account was deleted.
+	 */
+	@Query(value = """
+			select distinct on (o.task_id) o.task_id as taskId, o.scheduled_date as date, u.display_name as byName
+			from occurrence o
+			left join app_user u on u.id = o.completed_by
+			where o.task_id in (:taskIds) and o.status = 'DONE'
+			order by o.task_id, o.scheduled_date desc, o.completed_at desc nulls last""", nativeQuery = true)
+	List<LastDoneRow> findLastDone(@Param("taskIds") Collection<Long> taskIds);
+
+	/** A row of {@link #findLastDone}. */
+	interface LastDoneRow {
+
+		Long getTaskId();
+
+		LocalDate getDate();
+
+		String getByName();
+
+	}
 
 	/** The schedule's row shape: the occurrence, its task, and who completed it (if anyone). */
 	String SCHEDULE_ROW = """

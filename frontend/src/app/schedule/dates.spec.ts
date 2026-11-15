@@ -1,4 +1,4 @@
-import { addDays, dayLabel, startOfWeek, todayIn, weekLabel } from './dates';
+import { addDays, dayLabel, shortDayLabel, startOfWeek, todayIn, weekLabel } from './dates';
 
 describe('dates', () => {
   it("works out today in a time zone, whatever the device's zone (BILLIAMVT-51)", () => {
@@ -26,6 +26,12 @@ describe('dates', () => {
     expect(weekLabel('2026-11-08', '2026-11-14')).toBe('Nov 8 – 14, 2026');
     expect(weekLabel('2026-11-29', '2026-12-05')).toBe('Nov 29 – Dec 5, 2026');
     expect(weekLabel('2026-12-27', '2027-01-02')).toBe('Dec 27, 2026 – Jan 2, 2027');
+  });
+
+  it('labels days briefly, adding the year when it is not this year (BILLIAMVT-26)', () => {
+    const now = new Date(2026, 10, 15);
+    expect(shortDayLabel('2026-11-12', now)).toBe('Thu, Nov 12');
+    expect(shortDayLabel('2025-12-31', now)).toBe('Wed, Dec 31, 2025');
   });
 
   it('labels days', () => {
