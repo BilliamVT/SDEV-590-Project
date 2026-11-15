@@ -1,5 +1,5 @@
 .week {
-  margin: 1rem 0 1.5rem;
+  margin: var(--space-4) 0 var(--space-5);
 }
 
 .week-header {
@@ -7,7 +7,7 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--space-2);
 
   h2 {
     margin: 0;
@@ -16,11 +16,12 @@
 
 .week-nav {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .days {
-  margin: 1rem 0 0;
+  margin: var(--space-3) 0 0;
   padding: 0;
   list-style: none;
 
@@ -30,51 +31,63 @@
 }
 
 .day {
-  padding: 0.5rem 0.75rem;
+  padding: var(--space-2) var(--space-3);
   border-left: 4px solid transparent;
 
   & + .day {
-    border-top: 1px solid var(--color-neutral);
+    border-top: 1px solid var(--color-divider);
   }
 
   &.today {
-    border-left-color: var(--color-link);
+    border-left-color: var(--color-primary);
+    background: var(--color-surface);
   }
 
   h3 {
-    margin: 0.25rem 0;
-    font-size: 1rem;
+    margin: var(--space-1) 0;
+    font-size: var(--text-base);
   }
 
   ul {
-    margin: 0.25rem 0 0.5rem;
+    margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  // An empty day takes one short line, so the days with work stand out
+  &.empty-day {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--space-3);
+    padding-block: var(--space-1);
+
+    h3 {
+      font-weight: 600;
+    }
   }
 }
 
 .today-label {
-  margin-left: 0.5rem;
+  margin-left: var(--space-2);
   color: var(--color-link);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
+// One task on a day: a checklist row, the same height whatever its state (BILLIAMVT-49)
 .occurrence {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.25rem 0.5rem;
-  margin: 0.25rem 0;
-
-  &.overdue {
-    color: var(--color-error);
+  position: relative;
+  & + .occurrence {
+    border-top: 1px solid var(--color-divider);
   }
 
   &[data-status='DONE'],
   &[data-status='SKIPPED'],
   &.deleted {
-    color: var(--color-text-muted);
+    .name,
+    .meta {
+      color: var(--color-text-muted);
+    }
   }
 
   &[data-status='DONE'] .name {
@@ -82,52 +95,79 @@
   }
 }
 
-.details {
-  flex: 1 1 12rem;
+.row {
+  display: grid;
+  grid-template-columns: var(--touch) minmax(0, 1fr) var(--touch);
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--touch);
 }
 
-.actions {
-  display: flex;
-  gap: 0.5rem;
+.details {
+  min-width: 0;
+  padding: var(--space-1) 0;
+}
 
-  // Apple's minimum touch target (BILLIAMVT-49 restyles buttons app-wide)
-  button {
-    min-width: 44px;
-    min-height: 44px;
+.meta {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+
+  &:empty {
+    display: none;
   }
 }
 
-.status-label {
-  display: block;
-  font-size: 0.85rem;
+// The circle: a 44px touch target around a 22px circle, like Reminders and Todoist
+.check {
+  padding: 0;
+  border: none;
+  background: transparent;
+  margin-left: calc(-1 * var(--space-2));
 }
 
-.item-error {
-  flex-basis: 100%;
-  margin: 0;
-  color: var(--color-error);
-  font-size: 0.9rem;
+.circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  color: var(--color-on-primary);
+  font-size: var(--text-sm);
+  line-height: 1;
+
+  [data-status='DONE'] & {
+    border-color: var(--color-done);
+    background: var(--color-done);
+  }
+
+  [data-status='SKIPPED'] & {
+    border-color: var(--color-text-muted);
+    background: var(--color-text-muted);
+    color: var(--color-background);
+  }
+}
+
+.more {
+  padding: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xl);
 }
 
 .minutes {
-  margin-left: 0.5rem;
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
+  margin-left: var(--space-2);
 }
 
+// The only red on the week: a small pill, so overdue stands out without the whole row shouting
 .overdue-label {
-  margin-left: 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.empty,
-.hint {
-  margin: 0.25rem 0;
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-}
-
-.form-error {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-error-surface);
   color: var(--color-error);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
 }

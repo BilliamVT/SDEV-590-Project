@@ -1,11 +1,14 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Observable } from 'rxjs';
 
 import { errorMessage } from '../auth/error-message';
 import { HouseholdService } from '../household/household.service';
+import { Announcer } from '../shared/announcer';
+import { focusFirstInvalid, focusLater } from '../shared/focus';
 import { dayLabel } from '../schedule/dates';
+import { ConfirmSheet } from '../shared/confirm-sheet';
 import { BacklogItem } from './backlog.models';
 import { BacklogService } from './backlog.service';
 
@@ -22,11 +25,15 @@ interface Picking {
  */
 @Component({
   selector: 'app-backlog',
-  imports: [ReactiveFormsModule],
+  // A ⋯ menu closes on a tap anywhere else, or Escape (BILLIAMVT-49)
+  host: { '(document:click)': 'closeMenuOutside($event)', '(document:keydown.escape)': 'closeMenu()' },
+  imports: [ConfirmSheet, ReactiveFormsModule],
   templateUrl: './backlog.html',
   styleUrl: './backlog.scss',
 })
 export class Backlog {
+  private readonly host = inject(ElementRef<HTMLElement>).nativeElement;
+  private readonly announcer = inject(Announcer);
   private readonly backlog = inject(BacklogService);
   private readonly households = inject(HouseholdService);
 
@@ -45,10 +52,24 @@ export class Backlog {
     estimatedMinutes: [null as number | null, [Validators.min(1), Validators.max(1440)]],
   });
   protected readonly attempted = signal(false);
+  /** Field errors show after a try to add; each is linked to its field for screen readers (BILLIAMVT-49) */
+  protected nameInvalid(): boolean {
+    const name = this.form.controls.name;
+    return this.attempted() && (name.invalid || name.value?.trim() === '');
+  }
+
+  protected minutesInvalid(): boolean {
+    return this.attempted() && this.form.controls.estimatedMinutes.invalid;
+  }
   protected readonly adding = signal(false);
   protected readonly addError = signal<string | null>(null);
 
   protected readonly picking = signal<Picking | null>(null);
+  /** The item whose ⋯ menu (Mark done, Delete) is open */
+  protected readonly menuOpen = signal<number | null>(null);
+  /** The item the delete action sheet is open for */
+  protected readonly confirmingDelete = signal<number | null>(null);
+  protected readonly pendingDelete = computed(() => this.items()?.find((i) => i.id === this.confirmingDelete()) ?? null);
   protected readonly saving = signal<ReadonlySet<number>>(new Set());
   protected readonly itemErrors = signal<ReadonlyMap<number, string>>(new Map());
 
@@ -79,6 +100,7 @@ export class Backlog {
   protected add(): void {
     this.attempted.set(true);
     if (this.form.invalid || this.form.controls.name.value!.trim() === '') {
+      focusFirstInvalid(this.host);
       return;
     }
     const { name, estimatedMinutes } = this.form.getRawValue();
@@ -91,6 +113,7 @@ export class Backlog {
         this.form.reset();
         this.attempted.set(false);
         this.adding.set(false);
+        this.announcer.announce(`${item.name} added to the backlog`);
       },
       error: (err: unknown) => {
         this.addError.set(errorMessage(err));
@@ -106,9 +129,13 @@ export class Backlog {
 
   /** Opens the day picker; it starts on today for both actions. */
   protected pick(item: BacklogItem, action: Picking['action']): void {
+    this.confirmingDelete.set(null);
+    this.menuOpen.set(null);
     this.picking.set({ id: item.id, action, date: this.today() });
     this.notice.set(null);
     this.itemErrors.update((errors) => removeError(errors, item.id));
+    // Straight to the day picker, which appeared under the row
+    focusLater(this.host, `#backlog-day-${item.id}`);
   }
 
   protected setDate(date: string): void {
@@ -116,7 +143,11 @@ export class Backlog {
   }
 
   protected cancel(): void {
+    const id = this.picking()?.id;
     this.picking.set(null);
+    if (id !== undefined) {
+      this.focusMore(id);
+    }
   }
 
   protected confirm(item: BacklogItem): void {
@@ -136,16 +167,68 @@ export class Backlog {
         : `"${item.name}" is on ${dayLabel(picking.date)}.`;
     this.run(item, request, () => {
       this.picking.set(null);
+      // The visible notice is a status message, so screen readers read it out too
       this.notice.set(message);
       this.placed.emit();
+      this.focusHeading();
     });
   }
 
+  /** Asks first in an action sheet (BILLIAMVT-49; it used the browser's confirm before). */
   protected delete(item: BacklogItem): void {
-    if (!confirm(`Delete "${item.name}" from the backlog?`)) {
-      return;
+    this.menuOpen.set(null);
+    this.picking.set(null);
+    this.confirmingDelete.set(item.id);
+  }
+
+  protected confirmDelete(item: BacklogItem): void {
+    this.run(item, this.backlog.delete(item.id), () => {
+      this.notice.set(null);
+      this.confirmingDelete.set(null);
+      this.announcer.announce(`${item.name} deleted`);
+      this.focusHeading();
+    });
+  }
+
+  /** Opens or closes an item's ⋯ menu; only one is open at a time. */
+  protected toggleMenu(item: BacklogItem): void {
+    this.picking.set(null);
+    this.confirmingDelete.set(null);
+    this.menuOpen.update((open) => (open === item.id ? null : item.id));
+  }
+
+  /** Escape: closes the menu and puts focus back on its ⋯ button. */
+  protected closeMenu(): void {
+    const open = this.menuOpen();
+    this.menuOpen.set(null);
+    if (open !== null) {
+      this.focusMore(open);
     }
-    this.run(item, this.backlog.delete(item.id), () => this.notice.set(null));
+  }
+
+  /** A tap outside the open menu and its ⋯ button closes it. */
+  protected closeMenuOutside(event: Event): void {
+    const target = event.target as Element | null;
+    if (this.menuOpen() !== null && !target?.closest('.menu, .more')) {
+      this.menuOpen.set(null);
+    }
+  }
+
+  protected cancelDelete(): void {
+    const id = this.confirmingDelete();
+    this.confirmingDelete.set(null);
+    if (id !== null) {
+      this.focusMore(id);
+    }
+  }
+
+  private focusMore(id: number): void {
+    focusLater(this.host, `[data-more="${id}"]`);
+  }
+
+  /** The item left the list: focus the backlog's heading, so keyboard users stay in place. */
+  private focusHeading(): void {
+    focusLater(this.host, '#backlog-title');
   }
 
   /** Sends one item's change; on success the item leaves the list. */

@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
 
@@ -28,7 +29,11 @@ const theirs: Household = {
 };
 
 describe('HouseholdCard', () => {
-  async function render(join: () => Observable<Household> = () => of(theirs), current: Household | null = mine) {
+  async function render(
+    join: () => Observable<Household> = () => of(theirs),
+    current: Household | null = mine,
+    place: 'home' | 'settings' = current ? 'settings' : 'home',
+  ) {
     const households = {
       load: vi.fn(() => of(current)),
       create: vi.fn((name: string) => of({ ...mine, name })),
@@ -38,11 +43,13 @@ describe('HouseholdCard', () => {
     await TestBed.configureTestingModule({
       imports: [HouseholdCard],
       providers: [
+        provideRouter([]),
         { provide: HouseholdService, useValue: households },
         { provide: AuthService, useValue: { user: signal({ id: 2, email: 'bill@example.com', displayName: 'Bill' }) } },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(HouseholdCard);
+    fixture.componentRef.setInput('place', place);
     const changed = vi.fn();
     fixture.componentInstance.changed.subscribe(changed);
     await fixture.whenStable();
@@ -59,9 +66,8 @@ describe('HouseholdCard', () => {
     return { element, households, click, typeCode, changed };
   }
 
-  it('shows the household, its members and the invite code', async () => {
+  it('shows the members and the invite code in Settings (BILLIAMVT-49)', async () => {
     const { element } = await render();
-    expect(element.textContent).toContain("Bill's household");
     expect(element.querySelector('li')?.textContent).toBe('Bill');
     expect(element.querySelector('code')?.textContent).toBe('K7QM-3XRP');
   });
@@ -77,7 +83,6 @@ describe('HouseholdCard', () => {
 
     await click('Leave and join');
     expect(households.join).toHaveBeenCalledWith('abcd-2345');
-    expect(element.textContent).toContain("Sam's household");
     expect(element.querySelectorAll('li')).toHaveLength(2);
     // The week and backlog reload for the new household
     expect(changed).toHaveBeenCalledTimes(1);
@@ -104,7 +109,7 @@ describe('HouseholdCard', () => {
     await click('Join');
     await click('Leave and join');
     expect(element.textContent).toContain('No household has that invite code');
-    expect(element.textContent).toContain("Bill's household");
+    expect(element.querySelector('li')?.textContent).toBe('Bill');
   });
 
   it('replaces the invite code', async () => {
@@ -112,6 +117,11 @@ describe('HouseholdCard', () => {
     await click('New code');
     expect(element.querySelector('code')?.textContent).toBe('NEWC-0DE2');
     expect(changed).not.toHaveBeenCalled();
+  });
+
+  it('shows nothing on the home page once the user has a household: it is in Settings (BILLIAMVT-49)', async () => {
+    const { element } = await render(undefined, mine, 'home');
+    expect(element.textContent?.trim()).toBe('');
   });
 
   describe('without a household', () => {
@@ -122,7 +132,7 @@ describe('HouseholdCard', () => {
       expect(element.querySelector('#setup-invite-code')).not.toBeNull();
     });
 
-    it('creates the household and then shows it', async () => {
+    it('creates the household, then points to Settings for the invite code', async () => {
       const { element, households, click, typeCode, changed } = await render(undefined, null);
       typeCode('The Flat', 'household-name');
       await click('Create household');
@@ -131,7 +141,8 @@ describe('HouseholdCard', () => {
       // The week and backlog, hidden without a household, load now (found by the e2e tests, BILLIAMVT-47)
       expect(changed).toHaveBeenCalledTimes(1);
       expect(element.textContent).not.toContain('Set up your household');
-      expect(element.querySelector('.name')?.textContent).toBe('The Flat');
+      expect(element.querySelector('[role="status"]')?.textContent).toContain('The Flat is ready.');
+      expect(element.querySelector('a[href="/settings"]')).not.toBeNull();
     });
 
     it('joins straight away, with no warning since there is nothing to leave', async () => {
@@ -141,7 +152,7 @@ describe('HouseholdCard', () => {
 
       expect(households.join).toHaveBeenCalledWith('abcd-2345');
       expect(changed).toHaveBeenCalledTimes(1);
-      expect(element.textContent).toContain("Sam's household");
+      expect(element.textContent).toContain("Sam's household is ready.");
     });
 
     it('asks for a name', async () => {

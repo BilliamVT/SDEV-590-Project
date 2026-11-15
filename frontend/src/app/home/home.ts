@@ -1,14 +1,15 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
 import { Backlog } from '../backlog/backlog';
-import { HealthService } from '../health/health.service';
 import { HouseholdCard } from '../household/household-card';
 import { WeekView } from '../schedule/week-view';
 
-type ServerState = 'checking' | 'up' | 'down' | 'unreachable';
-
+/**
+ * The week first, with adding a task one tap away (BILLIAMVT-49). The household's details and the
+ * server status are in Settings; a new account sets up its household here.
+ */
 @Component({
   selector: 'app-home',
   imports: [Backlog, HouseholdCard, RouterLink, WeekView],
@@ -16,23 +17,10 @@ type ServerState = 'checking' | 'up' | 'down' | 'unreachable';
   styleUrl: './home.scss',
 })
 export class Home {
-  private readonly health = inject(HealthService);
   protected readonly auth = inject(AuthService);
 
-  protected readonly state = signal<ServerState>('checking');
-  protected readonly reportedStatus = signal<string | null>(null);
   /** Set when arriving from the New task form (BILLIAMVT-39). */
   protected readonly savedTask = inject(Router).currentNavigation()?.extras.state?.['savedTask'] as
     | { name: string; schedule: string }
     | undefined;
-
-  constructor() {
-    this.health.status().subscribe({
-      next: (status) => {
-        this.reportedStatus.set(status);
-        this.state.set(status === 'UP' ? 'up' : 'down');
-      },
-      error: () => this.state.set('unreachable'),
-    });
-  }
 }

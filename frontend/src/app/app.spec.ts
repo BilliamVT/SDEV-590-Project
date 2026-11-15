@@ -30,9 +30,9 @@ describe('App', () => {
     expect(element.textContent).not.toContain('Log out');
   });
 
-  it('shows who is signed in and logs out', async () => {
+  it('offers Settings and Log out when signed in (the name is on the home page and in Settings)', async () => {
     const { auth, router, element } = await render({ id: 2, email: 'bill@example.com', displayName: 'Bill' });
-    expect(element.textContent).toContain('Signed in as Bill');
+    expect(element.querySelector('header a[href="/settings"]')?.textContent).toBe('Settings');
 
     element.querySelector<HTMLButtonElement>('header button')!.click();
 

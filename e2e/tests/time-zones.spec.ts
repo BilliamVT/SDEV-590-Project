@@ -1,6 +1,6 @@
 import { type Browser, expect, test } from '@playwright/test';
 
-import { addBacklogItem, backlog, createHousehold, formReady, inviteCode, joinHousehold, register, today } from './helpers';
+import { addBacklogItem, backlog, createHousehold, formReady, inviteCode, joinHouseholdNamed, openMenu, register, today } from './helpers';
 
 /*
  * The household's "today" comes from the time zone of the browser that created it; members can
@@ -21,7 +21,7 @@ async function householdAcrossZones(browser: Browser, householdZone: string, sam
 
   const sam = await (await browser.newContext({ timezoneId: samZone })).newPage();
   await register(sam, 'Sam');
-  await joinHousehold(sam, code);
+  await joinHouseholdNamed(sam, code, 'Maple Street');
   await expect(sam.getByRole('button', { name: 'This week' })).toBeAttached();
   return sam;
 }
@@ -30,7 +30,8 @@ test('a member ahead of the household marks a backlog item done with the default
   const sam = await householdAcrossZones(browser, BEHIND, AHEAD);
   await addBacklogItem(sam, 'Hang shelves');
 
-  await backlog(sam).getByRole('button', { name: 'Mark Hang shelves done' }).click();
+  await openMenu(backlog(sam), 'Hang shelves');
+  await backlog(sam).getByRole('button', { name: 'Mark done: Hang shelves' }).click();
   await backlog(sam).getByRole('button', { name: 'Mark done' }).click();
 
   await expect(backlog(sam).getByText('Nothing in the backlog.')).toBeVisible();

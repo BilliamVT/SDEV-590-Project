@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { PASSWORD, createHousehold, formReady, inviteCode, joinHousehold, logIn, register, uniqueEmail } from './helpers';
+import { PASSWORD, createHousehold, expectHousehold, formReady, openSettings, inviteCode, joinHouseholdNamed, logIn, register, uniqueEmail } from './helpers';
 
 test('register, set up a household, log out and log back in', async ({ page }) => {
   const email = await register(page, 'Pat');
@@ -8,7 +8,7 @@ test('register, set up a household, log out and log back in', async ({ page }) =
   // A new account chooses to create or join a household
   await expect(page.getByRole('heading', { name: 'Set up your household' })).toBeVisible();
   await createHousehold(page, 'Maple Street');
-  await expect(page.getByText('Maple Street')).toBeVisible();
+  await expectHousehold(page, 'Maple Street');
 
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page).toHaveURL(/\/login$/);
@@ -18,7 +18,7 @@ test('register, set up a household, log out and log back in', async ({ page }) =
 
   await logIn(page, email);
   await expect(page.getByText('Welcome, Pat.')).toBeVisible();
-  await expect(page.getByText('Maple Street')).toBeVisible();
+  await expectHousehold(page, 'Maple Street');
 });
 
 test('a second user joins with the invite code and both see the same members', async ({ page, browser }) => {
@@ -30,14 +30,12 @@ test('a second user joins with the invite code and both see the same members', a
   const samContext = await browser.newContext();
   const sam = await samContext.newPage();
   await register(sam, 'Sam');
-  await joinHousehold(sam, code);
+  await joinHouseholdNamed(sam, code, 'Maple Street');
 
-  const members = (p: typeof page) => p.getByRole('heading', { name: 'Members' }).locator('xpath=following-sibling::ul[1]/li');
-  await expect(sam.getByText('Maple Street')).toBeVisible();
-  await expect(members(sam)).toHaveText(['Pat', 'Sam']);
+  await expectHousehold(sam, 'Maple Street', ['Pat', 'Sam']);
 
   await page.reload();
-  await expect(members(page)).toHaveText(['Pat', 'Sam']);
+  await expect(page.locator('.members li')).toHaveText(['Pat', 'Sam']);
   await samContext.close();
 });
 
@@ -45,8 +43,8 @@ test('deleting the account signs out, and the login stops working', async ({ pag
   const email = await register(page, 'Pat');
   await createHousehold(page, 'Maple Street');
 
-  await page.getByRole('link', { name: 'Settings' }).click();
-  await page.getByRole('button', { name: 'Delete my account…' }).click();
+  await openSettings(page);
+  await page.getByRole('button', { name: 'Delete my account' }).click();
   await formReady(page.getByLabel('Enter your password to confirm'));
   await page.getByLabel('Enter your password to confirm').fill(PASSWORD);
   await page.getByRole('button', { name: 'Permanently delete my account' }).click();
@@ -65,8 +63,11 @@ test('a session survives a page reload, and each page knows whether you are logg
   // The session is kept in the browser, so a reload or a typed address keeps you in
   await page.reload();
   await expect(page.getByText('Welcome, Pat.')).toBeVisible();
+  // Each page names itself in the browser title, which screen readers announce (BILLIAMVT-49)
+  await expect(page).toHaveTitle('Your week – Housework Scheduler');
   await page.goto('/tasks');
   await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page).toHaveTitle('Your tasks – Housework Scheduler');
 
   // Logged-in users don't see the login and register pages, and unknown addresses go home
   await page.goto('/login');

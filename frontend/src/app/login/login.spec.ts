@@ -51,6 +51,17 @@ describe('Login', () => {
     expect(element.textContent).toContain('Enter a valid email address');
   });
 
+  it('links each error to its field and moves focus to the first one (BILLIAMVT-49)', async () => {
+    const { element, submit } = await render(() => of({}));
+    await submit();
+    await new Promise((resolve) => setTimeout(resolve));
+
+    const email = element.querySelector<HTMLInputElement>('#email')!;
+    expect(email.getAttribute('aria-invalid')).toBe('true');
+    expect(element.querySelector(`#${email.getAttribute('aria-describedby')}`)?.textContent).toBe('Enter a valid email address.');
+    expect(document.activeElement).toBe(email);
+  });
+
   it('does not show field errors while typing, so the page does not shift', async () => {
     const { element, type } = await render(() => of({}));
     type('email', 'test');

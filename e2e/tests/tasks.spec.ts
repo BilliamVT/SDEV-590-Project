@@ -1,6 +1,6 @@
 import { type Page, expect, test } from '@playwright/test';
 
-import { addTask, signUpWithHousehold, today } from './helpers';
+import { addTask, signUpWithHousehold, today, confirmSheet } from './helpers';
 
 /** Changes made on the Tasks page show in the week on the home page. */
 test('editing, pausing, resuming and deleting a task changes the week', async ({ page }) => {
@@ -43,8 +43,8 @@ test('editing, pausing, resuming and deleting a task changes the week', async ({
 
   // Deleted, after confirming: gone from the list and from today
   await tasksPage();
-  await row(page, 'Wash dishes').getByRole('button', { name: 'Delete…' }).click();
-  await row(page, 'Wash dishes').getByRole('button', { name: 'Delete', exact: true }).click();
+  await row(page, 'Wash dishes').getByRole('button', { name: 'Delete' }).click();
+  await confirmSheet(page).getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByText('No tasks yet. Add your first one.')).toBeVisible();
   await week();
   await expect(today(page).getByText('Nothing scheduled')).toBeVisible();

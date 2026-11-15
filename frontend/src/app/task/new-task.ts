@@ -1,9 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, ElementRef, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { errorMessage } from '../auth/error-message';
 import { HouseholdService } from '../household/household.service';
+import { focusFirstInvalid } from '../shared/focus';
 import { CreateTaskRequest, DayOfWeek, Frequency } from './task.models';
 import { TaskService } from './task.service';
 
@@ -27,6 +28,7 @@ const INTERVAL_LIMITS: Partial<Record<Frequency, { max: number; unit: string }>>
   styleUrl: './new-task.scss',
 })
 export class NewTask {
+  private readonly host = inject(ElementRef<HTMLElement>).nativeElement;
   private readonly tasks = inject(TaskService);
   private readonly households = inject(HouseholdService);
   private readonly router = inject(Router);
@@ -196,6 +198,7 @@ export class NewTask {
   protected submit(): void {
     this.attempted.set(true);
     if (this.form.invalid || this.intervalInvalid() || this.startInvalid() || this.daysInvalid()) {
+      focusFirstInvalid(this.host);
       return;
     }
     this.saving.set(true);

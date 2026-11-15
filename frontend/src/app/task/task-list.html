@@ -1,12 +1,12 @@
-<h2>Your tasks</h2>
+<h2 tabindex="-1">Your tasks</h2>
 
 @if (savedTask; as saved) {
   <p class="notice" role="status">Saved: <strong>{{ saved.name }}</strong>, {{ saved.schedule }}.</p>
 }
 
 <p class="actions">
-  <a class="primary-action" routerLink="/tasks/new">Add a task</a>
-  <a routerLink="/">Back to the week</a>
+  <a class="button primary" routerLink="/tasks/new">Add a task</a>
+  <a class="button" routerLink="/">Back to the week</a>
 </p>
 
 @if (error()) {
@@ -32,23 +32,14 @@
               }
             </span>
           </div>
-          @if (confirmingId() === task.id) {
-            <p class="warning">Delete {{ task.name }}? Past occurrences stay in its history; upcoming ones are removed.</p>
-            <p class="buttons">
-              <button type="button" (click)="delete(task)" [disabled]="busyId() === task.id">
-                {{ busyId() === task.id ? 'Deleting…' : 'Delete' }}
-              </button>
-              <button type="button" (click)="confirmingId.set(null)" [disabled]="busyId() === task.id">Cancel</button>
-            </p>
-          } @else {
-            <p class="buttons">
-              <a [routerLink]="['/tasks', task.id, 'edit']">Edit</a>
-              <button type="button" (click)="togglePause(task)" [disabled]="busyId() === task.id">
-                {{ task.active ? 'Pause' : 'Resume' }}
-              </button>
-              <button type="button" (click)="confirmingId.set(task.id)" [disabled]="busyId() === task.id">Delete…</button>
-            </p>
-          }
+          <!-- One set of buttons, Edit included (BILLIAMVT-49) -->
+          <p class="row-actions">
+            <a class="button" [routerLink]="['/tasks', task.id, 'edit']">Edit</a>
+            <button type="button" (click)="togglePause(task)" [disabled]="busyId() === task.id">
+              {{ task.active ? 'Pause' : 'Resume' }}
+            </button>
+            <button type="button" class="delete" [attr.data-delete]="task.id" (click)="confirmingId.set(task.id)" [disabled]="busyId() === task.id">Delete</button>
+          </p>
         </li>
       }
     </ul>
@@ -56,3 +47,13 @@
 } @else if (!error()) {
   <p class="hint">Loading your tasks…</p>
 }
+
+<!-- Asks before deleting, the iPhone way (BILLIAMVT-49) -->
+<app-confirm-sheet
+  [open]="pendingDelete() !== null"
+  [message]="pendingDelete() ? 'Delete ' + pendingDelete()!.name + '? Its past days stay in the history; upcoming ones are removed.' : ''"
+  [busy]="pendingDelete() !== null && busyId() === pendingDelete()!.id"
+  [error]="pendingDelete() ? error() : null"
+  (confirmed)="delete(pendingDelete()!)"
+  (cancelled)="cancelDelete()"
+/>
