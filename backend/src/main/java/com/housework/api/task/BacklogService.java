@@ -99,14 +99,22 @@ public class BacklogService {
 	@Transactional
 	public void delete(long userId, long itemId) {
 		Household household = households.householdOf(userId);
-		Task item = tasks.findItem(household.getId(), itemId).orElseThrow(TaskNotFoundException::new);
+		Task item = tasks.lockItem(household.getId(), itemId).orElseThrow(TaskNotFoundException::new);
 		tasks.delete(item);
 		log.info("User {} deleted backlog item {}", userId, item.getId());
 	}
 
-	/** Items already on the schedule are changed from the week view instead (404 here). */
+	/**
+	 * An item still on the backlog, locked; one already on the schedule is changed from the week
+	 * view instead (404 here). Locked first, then checked, so an item scheduled or marked done by
+	 * someone else at the same moment isn't put on a second day (decision record 0007).
+	 */
 	private Task openItem(Household household, long itemId) {
-		return tasks.findOpenItem(household.getId(), itemId).orElseThrow(TaskNotFoundException::new);
+		Task item = tasks.lockItem(household.getId(), itemId).orElseThrow(TaskNotFoundException::new);
+		if (!tasks.isOpenItem(item.getId())) {
+			throw new TaskNotFoundException();
+		}
+		return item;
 	}
 
 	private LocalDate today(Household household) {
