@@ -84,7 +84,8 @@ public class TaskService {
 
 	@Transactional(readOnly = true)
 	public TaskResponse get(long userId, long taskId) {
-		return respond(task(households.householdOf(userId), taskId));
+		Household household = households.householdOf(userId);
+		return respond(tasks.findRecurring(household.getId(), taskId).orElseThrow(TaskNotFoundException::new));
 	}
 
 	/**
@@ -138,8 +139,9 @@ public class TaskService {
 		log.info("User {} deleted task {}", userId, task.getId());
 	}
 
+	/** A task to change, locked until the transaction ends (decision record 0007). */
 	private Task task(Household household, long taskId) {
-		return tasks.findRecurring(household.getId(), taskId)
+		return tasks.lockRecurring(household.getId(), taskId)
 			.orElseThrow(TaskNotFoundException::new);
 	}
 

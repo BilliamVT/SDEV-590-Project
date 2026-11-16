@@ -103,10 +103,17 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 	@Query(SCHEDULE_ROW + "where o.id = :id and t.householdId = :householdId")
 	Optional<ScheduledOccurrence> findScheduled(@Param("householdId") long householdId, @Param("id") long id);
 
-	/** An occurrence to change, only if it's in the household; deleted tasks' included (BILLIAMVT-25). */
-	@Query("""
-			select o from Occurrence o, Task t
-			where o.id = :id and t.id = o.taskId and t.householdId = :householdId""")
-	Optional<Occurrence> findByIdAndHouseholdId(@Param("id") long id, @Param("householdId") long householdId);
+	/**
+	 * An occurrence to change, only if it's in the household; deleted tasks' included (BILLIAMVT-25).
+	 * Locked until the transaction ends, so a status change, move or delete at the same moment runs
+	 * after this one and sees its result (decision record 0007). Only the occurrence row is locked
+	 * ({@code for update of o}), not its task, so it can't deadlock with a pause or edit.
+	 */
+	@Query(value = """
+			select o.* from occurrence o
+			join task t on t.id = o.task_id
+			where o.id = :id and t.household_id = :householdId
+			for update of o""", nativeQuery = true)
+	Optional<Occurrence> lockInHousehold(@Param("id") long id, @Param("householdId") long householdId);
 
 }

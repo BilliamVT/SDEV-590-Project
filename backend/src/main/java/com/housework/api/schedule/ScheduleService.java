@@ -70,7 +70,8 @@ public class ScheduleService {
 			throw new InvalidRangeException("You can view the schedule up to 2 years ahead.");
 		}
 		LocalDate target = generator.aheadOf(today).isAfter(to) ? generator.aheadOf(today) : to;
-		for (Task task : tasks.findAllByHouseholdIdAndActiveTrueAndDeletedAtIsNull(household.getId())) {
+		// Locked, so a pause or edit at the same moment isn't overwritten (decision record 0007)
+		for (Task task : tasks.lockScheduled(household.getId())) {
 			generator.generateThrough(task, target);
 		}
 		var rows = occurrences.findSchedule(household.getId(), from, to)
@@ -87,7 +88,7 @@ public class ScheduleService {
 	@Transactional
 	public OccurrenceResponse changeStatus(long userId, long occurrenceId, OccurrenceStatus status) {
 		Household household = households.householdOf(userId);
-		Occurrence occurrence = occurrences.findByIdAndHouseholdId(occurrenceId, household.getId())
+		Occurrence occurrence = occurrences.lockInHousehold(occurrenceId, household.getId())
 			.orElseThrow(OccurrenceNotFoundException::new);
 		OccurrenceStatus previous = occurrence.getStatus();
 		occurrence.changeStatus(status, userId, Instant.now(clock));
@@ -110,7 +111,7 @@ public class ScheduleService {
 	public OccurrenceResponse move(long userId, long occurrenceId, LocalDate date) {
 		flags.requireDragDrop();
 		Household household = households.householdOf(userId);
-		Occurrence occurrence = occurrences.findByIdAndHouseholdId(occurrenceId, household.getId())
+		Occurrence occurrence = occurrences.lockInHousehold(occurrenceId, household.getId())
 			.orElseThrow(OccurrenceNotFoundException::new);
 		if (occurrence.getStatus() != OccurrenceStatus.PENDING) {
 			throw new OccurrenceNotMovableException("Only a day that isn't done or skipped can be moved.");
@@ -143,7 +144,7 @@ public class ScheduleService {
 	@Transactional
 	public void deleteOccurrence(long userId, long occurrenceId) {
 		Household household = households.householdOf(userId);
-		Occurrence occurrence = occurrences.findByIdAndHouseholdId(occurrenceId, household.getId())
+		Occurrence occurrence = occurrences.lockInHousehold(occurrenceId, household.getId())
 			.orElseThrow(OccurrenceNotFoundException::new);
 		occurrences.delete(occurrence);
 		log.info("User {} deleted occurrence {} of task {}", userId, occurrenceId, occurrence.getTaskId());
