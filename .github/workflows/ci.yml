@@ -107,8 +107,14 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
+    # Playwright's own image: Chromium, WebKit and their system libraries are preinstalled.
+    # Installing WebKit's libraries on the runner (about 140 MB from Ubuntu's mirror) stalled
+    # several times on Nov 18. Keep the version in step with @playwright/test in e2e/package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
     timeout-minutes: 20
     services:
+      # Inside a container job, the database is reached by this name, not localhost
       postgres:
         image: postgres:18
         # The same database, user and password as the local profile and docker-compose.yml
@@ -116,8 +122,6 @@ jobs:
           POSTGRES_DB: housework
           POSTGRES_USER: housework
           POSTGRES_PASSWORD: housework
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U housework -d housework"
           --health-interval 5s
@@ -154,42 +158,13 @@ jobs:
         working-directory: e2e
         run: npm ci
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
-
-      # Cached after the first run, so this is quick
-      - name: Install browsers
-        working-directory: e2e
-        timeout-minutes: 5
-        run: npx playwright install chromium webkit
-
-      # WebKit's system libraries (about 140 MB from Ubuntu's mirror, every run). A mirror
-      # connection stalled twice on Nov 18 with apt waiting forever. apt now gives up on a stalled
-      # connection after 30 s and retries, waits up to 2 minutes for the package lock instead of
-      # failing at once, and the whole install is tried up to 3 times. No per-try `timeout`: it
-      # stopped npx but left apt running and holding the lock, so every retry failed instantly.
-      - name: Install browser system libraries
-        working-directory: e2e
-        timeout-minutes: 8
-        run: |
-          printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' \
-            'Acquire::https::Timeout "30";' 'DPkg::Lock::Timeout "120";' \
-            | sudo tee /etc/apt/apt.conf.d/80-ci-retries > /dev/null
-          for attempt in 1 2 3; do
-            npx playwright install-deps chromium webkit && exit 0
-            echo "::warning::Installing browser system libraries failed (attempt $attempt of 3)"
-            sleep 10
-          done
-          exit 1
-
       - name: Run end-to-end tests
         working-directory: e2e
         run: npx playwright test
         env:
           SPRING_PROFILES_ACTIVE: local
+          # The Postgres service, by name (see above); the rest of the local profile applies
+          SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/housework
           E2E_BACKEND_COMMAND: java -jar target/housework-api-0.0.1-SNAPSHOT.jar
 
       # Open with "npx playwright show-report" (or show-trace for one test's trace.zip)
