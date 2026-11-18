@@ -1,7 +1,8 @@
 @if (!noHousehold()) {
   <section class="week" aria-labelledby="week-title">
     <div class="week-header">
-      <h2 id="week-title">{{ title() }}</h2>
+      <!-- Focusable from code only: where focus goes after the week is reloaded under a stale action -->
+      <h2 id="week-title" tabindex="-1">{{ title() }}</h2>
       <nav class="week-nav" aria-label="Choose a week">
         <button type="button" (click)="previous()" [disabled]="loading()">‹ Previous</button>
         <button type="button" (click)="today()" [disabled]="loading() || isThisWeek()">This week</button>
@@ -10,6 +11,9 @@
     </div>
     @if (atLimit()) {
       <p class="hint">You can plan up to 2 years ahead.</p>
+    }
+    @if (notice()) {
+      <p class="notice" role="status">{{ notice() }}</p>
     }
 
     @if (error()) {
