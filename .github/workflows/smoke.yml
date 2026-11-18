@@ -1,0 +1,85 @@
+name: Smoke test
+
+# After each successful deploy, checks in real browsers that production works: logs in with a
+# dedicated account, sees its week and household, logs out (BILLIAMVT-48). Read-only, so it never
+# changes production data. Can also be run by hand from the Actions tab.
+#
+# A failure here doesn't count as a failed deployment in the delivery metrics: a real break is
+# fixed in a PR labelled "hotfix", which does (Change Log, 2026-11-18).
+on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# A later deploy's smoke test replaces one still waiting
+concurrency:
+  group: smoke-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke test production
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install test dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
+
+      # Cached after the first run, so this is quick
+      - name: Install browsers
+        working-directory: e2e
+        timeout-minutes: 5
+        run: npx playwright install chromium webkit
+
+      # WebKit's system libraries (about 140 MB from Ubuntu's mirror, every run). A mirror
+      # connection once stalled with apt waiting forever, so apt gives up on a stalled connection
+      # after 30 s and retries, and the whole install is tried up to 3 times.
+      - name: Install browser system libraries
+        working-directory: e2e
+        timeout-minutes: 8
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+            | sudo tee /etc/apt/apt.conf.d/80-ci-retries > /dev/null
+          for attempt in 1 2 3; do
+            timeout 150 npx playwright install-deps chromium webkit && exit 0
+            echo "::warning::Installing browser system libraries failed or stalled (attempt $attempt of 3)"
+          done
+          exit 1
+
+      - name: Run the smoke test
+        working-directory: e2e
+        run: npx playwright test -c smoke.config.ts
+        env:
+          SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
+          SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
+
+      # Open with "npx playwright show-report <folder>"; each failure has a screenshot and trace
+      - name: Upload report and traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/

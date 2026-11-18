@@ -152,6 +152,15 @@ npx playwright test
 
 In CI, the **End-to-end tests** job runs on every PR that changes `backend/`, `frontend/` or `e2e/`, against Postgres in a service container and the servers started inside the job (never production). It's a required check, so a failing test blocks merging. When it fails, download the run's **playwright-report** artifact and open it with `npx playwright show-report <folder>`; each failed test has a trace (`npx playwright show-trace <trace.zip>`) that steps through every action with screenshots.
 
+### Smoke test (production)
+
+After every successful deploy, the **Smoke test** workflow (`.github/workflows/smoke.yml`) checks production in Chromium and WebKit: it waits for the backend to wake up, logs in with a dedicated account, checks the week loads and Settings shows its household, and logs out (`e2e/smoke/`, config `e2e/smoke.config.ts`). It's **read-only**: it never registers, creates or changes anything. Run it by hand from **Actions → Smoke test → Run workflow**.
+
+- **The smoke account:** "Smoke Test", in a household named "Smoke test" with **no tasks** (so viewing its week generates nothing). Its email and password are the `SMOKE_TEST_EMAIL` and `SMOKE_TEST_PASSWORD` repository secrets; never commit them. Leave this household out of usage numbers (BILLIAMVT-31).
+- **When it fails:** download the run's **smoke-report** artifact and open it with `npx playwright show-report <folder>`; each failure has a screenshot and a trace. A timeout while waiting for the backend is usually a slow cold start: re-run it. Otherwise check the app yourself, then Render's logs and the last deploy. A real break is fixed in a PR labelled `hotfix`.
+- **Metrics:** a failed smoke test doesn't count as a failed deployment by itself; the `hotfix` label on the fix does (Change Log, 2026-11-18).
+- **Locally**, from `e2e/`, with the account's details in your environment: `npx playwright test -c smoke.config.ts`. `SMOKE_BASE_URL` and `SMOKE_BACKEND_URL` point it somewhere else, such as `http://localhost:4200/` and `http://localhost:8080`.
+
 ## Build and run the jar
 
 ```bash
