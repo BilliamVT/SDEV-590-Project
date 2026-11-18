@@ -8,6 +8,7 @@ import { HouseholdService } from '../household/household.service';
 import { Announcer } from '../shared/announcer';
 import { focusFirstInvalid, focusLater } from '../shared/focus';
 import { dayLabel } from '../schedule/dates';
+import { isStale } from '../schedule/stale';
 import { ConfirmSheet } from '../shared/confirm-sheet';
 import { BacklogItem } from './backlog.models';
 import { BacklogService } from './backlog.service';
@@ -25,8 +26,13 @@ interface Picking {
  */
 @Component({
   selector: 'app-backlog',
-  // A ⋯ menu closes on a tap anywhere else, or Escape (BILLIAMVT-49)
-  host: { '(document:click)': 'closeMenuOutside($event)', '(document:keydown.escape)': 'closeMenu()' },
+  host: {
+    // A ⋯ menu closes on a tap anywhere else, or Escape (BILLIAMVT-49)
+    '(document:click)': 'closeMenuOutside($event)',
+    '(document:keydown.escape)': 'closeMenu()',
+    // Back in the app: items may have changed on another phone (BILLIAMVT-55)
+    '(document:visibilitychange)': 'refreshIfVisible()',
+  },
   imports: [ConfirmSheet, ReactiveFormsModule],
   templateUrl: './backlog.html',
   styleUrl: './backlog.scss',
@@ -77,14 +83,18 @@ export class Backlog {
     this.reload();
   }
 
-  /** Called after the week view changes (a removed day puts its item back here), or the household changes. */
-  reload(): void {
+  /**
+   * Called after the week view changes (a removed day puts its item back here), or the household
+   * changes. {@code after} runs once the list has loaded.
+   */
+  reload(after?: () => void): void {
     this.notice.set(null);
     this.backlog.list().subscribe({
       next: (items) => {
         this.items.set(items);
         this.noHousehold.set(false);
         this.error.set(null);
+        after?.();
       },
       error: (err: unknown) => {
         this.noHousehold.set(err instanceof HttpErrorResponse && err.status === 404);
@@ -243,10 +253,35 @@ export class Backlog {
         done();
       },
       error: (err: unknown) => {
-        this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
         this.saving.update((ids) => removeId(ids, id));
+        if (isStale(err)) {
+          this.refreshAfterStale(item);
+        } else {
+          this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
+        }
       },
     });
+  }
+
+  /**
+   * The item was already put on a day or deleted, e.g. on another phone (404). Reload both lists
+   * and say so, without guessing who or why: items don't record that (decision record 0007).
+   */
+  private refreshAfterStale(item: BacklogItem): void {
+    this.picking.set(null);
+    this.confirmingDelete.set(null);
+    this.placed.emit();
+    this.reload(() => {
+      this.notice.set(`${item.name} is no longer on the backlog. Your week and backlog are up to date.`);
+      this.focusHeading();
+    });
+  }
+
+  /** Coming back to the app reloads the list silently: a change appearing isn't an error. */
+  protected refreshIfVisible(): void {
+    if (document.visibilityState === 'visible' && !this.noHousehold()) {
+      this.reload();
+    }
   }
 }
 

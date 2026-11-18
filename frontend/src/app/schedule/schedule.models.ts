@@ -15,6 +15,8 @@ export interface ScheduledOccurrence {
   taskDeleted: boolean;
   /** Who marked it done or skipped, and when (ISO instant); null while pending (BILLIAMVT-25) */
   completedByName: string | null;
+  /** That member's id, to tell "you" from another member with the same name; null if their account was deleted (BILLIAMVT-55) */
+  completedById: number | null;
   completedAt: string | null;
   /** A backlog item's day: deleting it can put the item back in the backlog (BILLIAMVT-23). */
   oneOff: boolean;

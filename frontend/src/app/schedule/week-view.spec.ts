@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { NEVER, Observable, of, throwError } from 'rxjs';
 
+import { AuthService } from '../auth/auth.service';
 import { BacklogService } from '../backlog/backlog.service';
 import { Announcer } from '../shared/announcer';
 import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
@@ -19,6 +21,7 @@ const occurrence = (id: number, taskName: string, date: string, extra: Partial<S
   overdue: false,
   taskDeleted: false,
   completedByName: null,
+  completedById: null,
   completedAt: null,
   oneOff: false,
   ...extra,
@@ -31,6 +34,9 @@ const schedule = (from: string, to: string, occurrences: ScheduledOccurrence[] =
   lastViewableDate,
   occurrences,
 });
+
+/** The logged-in user: Pat, id 1. A day this account marks done comes back with completedById ME. */
+const ME = 1;
 
 /** The delete action sheet (BILLIAMVT-49): whether it's open, and what it asks. */
 const sheetOpen = (element: HTMLElement) => element.querySelector('dialog.sheet')!.hasAttribute('open');
@@ -57,6 +63,7 @@ describe('WeekView', () => {
       providers: [
         { provide: ScheduleService, useValue: schedules },
         { provide: BacklogService, useValue: backlog },
+        { provide: AuthService, useValue: { user: signal({ id: ME, email: 'pat@example.com', displayName: 'Pat' }) } },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(WeekView);
@@ -178,7 +185,7 @@ describe('WeekView', () => {
 
     it('marks a task done and shows who did it', async () => {
       const { schedules, element, click } = await render(withVacuum, (id, status) =>
-        of({ ...vacuum, status, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' }),
+        of({ ...vacuum, completedById: ME, status, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' }),
       );
 
       // The circle, as in a checklist (BILLIAMVT-49)
@@ -200,7 +207,7 @@ describe('WeekView', () => {
     });
 
     it('tells screen readers what changed, and keeps focus on the circle (BILLIAMVT-49)', async () => {
-      const { element, click, button } = await render(withVacuum, (id, status) => of({ ...vacuum, status }));
+      const { element, click, button } = await render(withVacuum, (id, status) => of({ ...vacuum, completedById: ME, status }));
       const circle = button('Mark Vacuum done, Wednesday, Nov 11');
       circle.focus();
 
@@ -216,7 +223,7 @@ describe('WeekView', () => {
 
     it('skips a task', async () => {
       const { schedules, element, click, button } = await render(withVacuum, (id, status) =>
-        of({ ...vacuum, status, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' }),
+        of({ ...vacuum, completedById: ME, status, completedByName: 'Pat', completedAt: '2026-11-11T17:00:00Z' }),
       );
 
       // Skip is under ⋯, which closes again afterwards
@@ -230,7 +237,7 @@ describe('WeekView', () => {
     });
 
     it('tells the page when a status changes, so the backlog can reload (BILLIAMVT-23)', async () => {
-      const { fixture, click } = await render(withVacuum, (id, status) => of({ ...vacuum, status }));
+      const { fixture, click } = await render(withVacuum, (id, status) => of({ ...vacuum, completedById: ME, status }));
       const changed = vi.fn();
       fixture.componentInstance.changed.subscribe(changed);
 
@@ -477,6 +484,128 @@ describe('WeekView', () => {
       expect(element.querySelector('.occurrence .item-error')?.textContent).toContain("couldn't be reached");
       expect(sheetOpen(element)).toBe(true);
       expect(element.querySelector('dialog.sheet [role="alert"]')?.textContent).toContain("couldn't be reached");
+    });
+  });
+
+  describe('when the week changed elsewhere (BILLIAMVT-55)', () => {
+    const vacuum = occurrence(1, 'Vacuum', '2026-11-11');
+    const notice = (element: HTMLElement) =>
+      element.querySelector('.notice[role="status"]')?.textContent?.trim();
+    const conflict = (status: number) => () => throwError(() => new HttpErrorResponse({ status }));
+
+    it('reloads silently when the app comes back into view', async () => {
+      const { schedules, element, fixture } = await render((from, to) =>
+        of(schedule(from, to, [vacuum])),
+      );
+      expect(schedules.between).toHaveBeenCalledTimes(1);
+
+      document.dispatchEvent(new Event('visibilitychange'));
+      await fixture.whenStable();
+
+      expect(schedules.between).toHaveBeenCalledTimes(2);
+      expect(notice(element)).toBeUndefined();
+    });
+
+    it('names who already marked it done, reloads, and tells the backlog', async () => {
+      const { schedules, element, click, fixture } = await render(
+        (from, to) => of(schedule(from, to, [vacuum])),
+        (id, status) => of({ ...vacuum, status, completedById: 2, completedByName: 'Sam' }),
+      );
+      const changed = vi.fn();
+      fixture.componentInstance.changed.subscribe(changed);
+
+      await click('Mark Vacuum done, Wednesday, Nov 11');
+
+      expect(notice(element)).toBe('Sam already marked Vacuum done. Your week is up to date.');
+      expect(schedules.between).toHaveBeenCalledTimes(2);
+      expect(changed).toHaveBeenCalled();
+    });
+
+    it('says "You" when this account already did it, e.g. on another device (409)', async () => {
+      let calls = 0;
+      const doneByMe = {
+        ...vacuum,
+        status: 'DONE' as const,
+        completedById: ME,
+        completedByName: 'Pat',
+      };
+      const { element, click } = await render(
+        (from, to) => of(schedule(from, to, [calls++ === 0 ? vacuum : doneByMe])),
+        conflict(409),
+      );
+
+      await click('Mark Vacuum done, Wednesday, Nov 11');
+
+      expect(notice(element)).toBe('You already marked Vacuum done. Your week is up to date.');
+    });
+
+    it('stays neutral when the member who did it has deleted their account', async () => {
+      const { element, click } = await render(
+        (from, to) => of(schedule(from, to, [vacuum])),
+        (id, status) => of({ ...vacuum, status, completedById: null, completedByName: null }),
+      );
+
+      await click('Mark Vacuum done, Wednesday, Nov 11');
+
+      expect(notice(element)).toBe('Vacuum was already marked done. Your week is up to date.');
+    });
+
+    it('says a day was already removed (404), and reloads', async () => {
+      let calls = 0;
+      const { element, click } = await render(
+        (from, to) => of(schedule(from, to, calls++ === 0 ? [vacuum] : [])),
+        conflict(404),
+      );
+
+      await click('Mark Vacuum done, Wednesday, Nov 11');
+
+      expect(notice(element)).toBe('Vacuum was already removed. Your week is up to date.');
+      expect(element.querySelector('.occurrence')).toBeNull();
+      expect(element.querySelector('.item-error')).toBeNull();
+    });
+
+    it('describes the day as it is now after a conflict (409)', async () => {
+      let calls = 0;
+      const skippedBySam = {
+        ...vacuum,
+        status: 'SKIPPED' as const,
+        completedById: 2,
+        completedByName: 'Sam',
+      };
+      const { element, click } = await render(
+        (from, to) => of(schedule(from, to, [calls++ === 0 ? vacuum : skippedBySam])),
+        conflict(409),
+      );
+
+      await click('Mark Vacuum done, Wednesday, Nov 11');
+
+      expect(notice(element)).toBe('Sam already skipped Vacuum. Your week is up to date.');
+    });
+
+    it('clears the notice on the next action', async () => {
+      let calls = 0;
+      const { element, click } = await render(
+        (from, to) => of(schedule(from, to, calls++ === 0 ? [vacuum] : [])),
+        conflict(404),
+      );
+      await click('Mark Vacuum done, Wednesday, Nov 11');
+      expect(notice(element)).toBeDefined();
+
+      await click('‹ Previous');
+
+      expect(notice(element)).toBeUndefined();
+    });
+
+    it('still shows other errors on the row', async () => {
+      const { element, click } = await render(
+        (from, to) => of(schedule(from, to, [vacuum])),
+        conflict(500),
+      );
+
+      await click('Mark Vacuum done, Wednesday, Nov 11');
+
+      expect(notice(element)).toBeUndefined();
+      expect(element.querySelector('.item-error')).not.toBeNull();
     });
   });
 

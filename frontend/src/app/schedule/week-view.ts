@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, computed, inject, output, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 
+import { AuthService } from '../auth/auth.service';
 import { errorMessage } from '../auth/error-message';
 import { BacklogService } from '../backlog/backlog.service';
 import { Announcer } from '../shared/announcer';
@@ -10,6 +11,7 @@ import { focusLater } from '../shared/focus';
 import { addDays, dayLabel, startOfWeek, toIsoDate, weekLabel } from './dates';
 import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
 import { ScheduleService } from './schedule.service';
+import { changedMessage, isStale, removedMessage, wasAlready } from './stale';
 
 interface Day {
   date: string;
@@ -22,8 +24,13 @@ interface Day {
 @Component({
   selector: 'app-week-view',
   imports: [ConfirmSheet],
-  // A ⋯ menu closes on a tap anywhere else, or Escape (BILLIAMVT-49)
-  host: { '(document:click)': 'closeMenuOutside($event)', '(document:keydown.escape)': 'closeMenu()' },
+  host: {
+    // A ⋯ menu closes on a tap anywhere else, or Escape (BILLIAMVT-49)
+    '(document:click)': 'closeMenuOutside($event)',
+    '(document:keydown.escape)': 'closeMenu()',
+    // Back in the app: the week may have changed on another phone (BILLIAMVT-55)
+    '(document:visibilitychange)': 'refreshIfVisible()',
+  },
   templateUrl: './week-view.html',
   styleUrl: './week-view.scss',
 })
@@ -31,6 +38,7 @@ export class WeekView {
   private readonly schedules = inject(ScheduleService);
   private readonly backlog = inject(BacklogService);
   private readonly announcer = inject(Announcer);
+  private readonly auth = inject(AuthService);
   private readonly host = inject(ElementRef<HTMLElement>).nativeElement;
 
   /** A status changed or a day was deleted; a one-off item may be back in the backlog (BILLIAMVT-23). */
@@ -55,6 +63,11 @@ export class WeekView {
   protected readonly menuOpen = signal<number | null>(null);
   /** The day the delete action sheet is open for */
   protected readonly choosingDelete = signal<number | null>(null);
+  /**
+   * Says that an action found its day already changed, and the week was reloaded (BILLIAMVT-55).
+   * Shown as a status message, so screen readers read it too; cleared by the next action.
+   */
+  protected readonly notice = signal<string | null>(null);
   /** A failed status change, shown on that occurrence */
   protected readonly itemErrors = signal<ReadonlyMap<number, string>>(new Map());
 
@@ -127,23 +140,26 @@ export class WeekView {
     const fromMenu = this.menuOpen() === id;
     this.saving.update((ids) => new Set(ids).add(id));
     this.itemErrors.update((errors) => removeError(errors, id));
+    this.notice.set(null);
     this.menuOpen.set(null);
     this.schedules.changeStatus(id, status).subscribe({
       next: (updated) => {
+        this.saving.update((ids) => removeId(ids, id));
+        if (wasAlready(updated, status, this.myId())) {
+          // Someone else got there first; other days may have changed too
+          this.refreshAfterStale(changedMessage(updated, this.myId()));
+          return;
+        }
         this.schedule.update((schedule) =>
           schedule && { ...schedule, occurrences: schedule.occurrences.map((o) => (o.id === id ? updated : o)) },
         );
-        this.saving.update((ids) => removeId(ids, id));
         this.changed.emit();
         this.announcer.announce(`${occurrence.taskName} ${STATUS_WORDS[status]}`);
         if (fromMenu) {
           this.focusMore(id);
         }
       },
-      error: (err: unknown) => {
-        this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
-        this.saving.update((ids) => removeId(ids, id));
-      },
+      error: (err: unknown) => this.failed(occurrence, err),
     });
   }
 
@@ -241,6 +257,7 @@ export class WeekView {
     const id = occurrence.id;
     this.saving.update((ids) => new Set(ids).add(id));
     this.itemErrors.update((errors) => removeError(errors, id));
+    this.notice.set(null);
     request.subscribe({
       next: () => {
         this.schedule.update(
@@ -253,11 +270,48 @@ export class WeekView {
         // The row is gone: focus its day's heading, so keyboard users stay in place
         focusLater(this.host, `[data-date="${occurrence.date}"] h3`);
       },
-      error: (err: unknown) => {
-        this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
-        this.saving.update((ids) => removeId(ids, id));
-      },
+      error: (err: unknown) => this.failed(occurrence, err),
     });
+  }
+
+  /**
+   * An action failed. If its day had changed (409) or gone (404), reload the week and say what
+   * happened (decision record 0007); otherwise show the error on the row, as before.
+   */
+  private failed(occurrence: ScheduledOccurrence, err: unknown): void {
+    const id = occurrence.id;
+    this.saving.update((ids) => removeId(ids, id));
+    if (!isStale(err)) {
+      this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
+      return;
+    }
+    this.choosingDelete.set(null);
+    if (err.status === 404) {
+      this.refreshAfterStale(removedMessage(occurrence.taskName));
+    } else {
+      this.refreshAfterStale((schedule) => changedMessage(schedule.occurrences.find((o) => o.id === id), this.myId()));
+    }
+  }
+
+  /** Reloads the week (and, through changed, the backlog), then shows the notice. */
+  private refreshAfterStale(message: string | ((schedule: Schedule) => string)): void {
+    this.changed.emit();
+    this.load((schedule) => {
+      this.notice.set(typeof message === 'string' ? message : message(schedule));
+      focusLater(this.host, '#week-title');
+    });
+  }
+
+  /** Coming back to the app reloads the week silently: a change appearing isn't an error. */
+  protected refreshIfVisible(): void {
+    if (document.visibilityState === 'visible' && !this.noHousehold()) {
+      this.notice.set(null);
+      this.load();
+    }
+  }
+
+  private myId(): number | null {
+    return this.auth.user()?.id ?? null;
   }
 
   /** Called after a backlog item is put on a day, or the household changes. */
@@ -266,6 +320,7 @@ export class WeekView {
   }
 
   private go(weekStart: string): void {
+    this.notice.set(null);
     this.weekStart.set(weekStart);
     this.announcer.announce(`Showing ${this.title()}`);
     this.load();
@@ -275,7 +330,8 @@ export class WeekView {
     focusLater(this.host, `[data-more="${id}"]`);
   }
 
-  private load(): void {
+  /** {@code after} runs once the week has loaded, e.g. to show a notice about what changed. */
+  private load(after?: (schedule: Schedule) => void): void {
     this.loading.set(true);
     this.error.set(null);
     this.schedules.between(this.weekStart(), this.weekEnd()).subscribe({
@@ -292,6 +348,7 @@ export class WeekView {
         this.schedule.set(schedule);
         this.noHousehold.set(false);
         this.loading.set(false);
+        after?.(schedule);
       },
       error: (err: unknown) => {
         this.noHousehold.set(err instanceof HttpErrorResponse && err.status === 404);

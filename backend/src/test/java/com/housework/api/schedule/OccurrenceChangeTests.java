@@ -49,6 +49,9 @@ class OccurrenceChangeTests {
 		assertThat(result).hasStatusOk();
 		assertThat(JsonPath.<String>read(body(result), "$.status")).isEqualTo("DONE");
 		assertThat(JsonPath.<String>read(body(result), "$.completedByName")).isEqualTo("Pat");
+		// The id too, so the front end can tell "you" from another member with the same name (BILLIAMVT-55)
+		long patId = jdbc.sql("select id from app_user where email = 'pat@example.com'").query(Long.class).single();
+		assertThat(((Number) JsonPath.read(body(result), "$.completedById")).longValue()).isEqualTo(patId);
 		assertThat(JsonPath.<String>read(body(result), "$.completedAt")).isNotNull();
 		String schedule = body(schedule(token, today, today));
 		assertThat(JsonPath.<String>read(schedule, "$.occurrences[0].status")).isEqualTo("DONE");
@@ -68,6 +71,7 @@ class OccurrenceChangeTests {
 		assertThat(undone).hasStatusOk();
 		assertThat(JsonPath.<String>read(body(undone), "$.status")).isEqualTo("PENDING");
 		assertThat(JsonPath.<String>read(body(undone), "$.completedByName")).isNull();
+		assertThat(JsonPath.<Object>read(body(undone), "$.completedById")).isNull();
 		assertThat(JsonPath.<String>read(body(undone), "$.completedAt")).isNull();
 	}
 

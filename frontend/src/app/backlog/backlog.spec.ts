@@ -264,6 +264,56 @@ describe('Backlog (BILLIAMVT-23)', () => {
     expect(element.querySelector('.backlog')).not.toBeNull();
   });
 
+  describe('when an item changed elsewhere (BILLIAMVT-55)', () => {
+    const notice = (element: HTMLElement) =>
+      element.querySelector('.notice[role="status"]')?.textContent?.trim();
+
+    it('reloads silently when the app comes back into view', async () => {
+      const { backlog, element, fixture } = await render();
+      expect(backlog.list).toHaveBeenCalledTimes(1);
+
+      document.dispatchEvent(new Event('visibilitychange'));
+      await fixture.whenStable();
+
+      expect(backlog.list).toHaveBeenCalledTimes(2);
+      expect(notice(element)).toBeUndefined();
+    });
+
+    it('says an item already put on a day or deleted is gone, without guessing who, and reloads both lists', async () => {
+      let calls = 0;
+      const { backlog, element, click, placed } = await render({
+        list: () => of(calls++ === 0 ? [shelves, gutters] : [gutters]),
+        done: () => throwError(() => new HttpErrorResponse({ status: 404 })),
+      });
+
+      await click('More for Hang shelves');
+      await click('Mark done: Hang shelves');
+      await click('Mark done');
+
+      expect(notice(element)).toBe(
+        'Hang shelves is no longer on the backlog. Your week and backlog are up to date.',
+      );
+      expect(backlog.list).toHaveBeenCalledTimes(2);
+      expect(placed).toHaveBeenCalled();
+      expect(element.querySelector('.item-error')).toBeNull();
+      // The day picker closed
+      expect(element.querySelector('#backlog-day-1')).toBeNull();
+    });
+
+    it('still shows other errors on the item', async () => {
+      const { element, click } = await render({
+        done: () => throwError(() => new HttpErrorResponse({ status: 500 })),
+      });
+
+      await click('More for Hang shelves');
+      await click('Mark done: Hang shelves');
+      await click('Mark done');
+
+      expect(notice(element)).toBeUndefined();
+      expect(element.querySelector('.item-error')).not.toBeNull();
+    });
+  });
+
   it('shows nothing without a household', async () => {
     const { element } = await render({ list: () => throwError(() => new HttpErrorResponse({ status: 404 })) });
     expect(element.querySelector('.backlog')).toBeNull();
