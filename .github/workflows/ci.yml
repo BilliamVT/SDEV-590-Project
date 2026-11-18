@@ -160,13 +160,26 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
 
-      # --with-deps also installs the system libraries WebKit needs; cached browsers aren't downloaded again.
-      # Usually 30-60 s. A stalled download once hung here until the job's 20-minute timeout (Sprint 4
-      # retro), so it fails after 5 minutes instead; re-run the failed job.
+      # Cached after the first run, so this is quick
       - name: Install browsers
         working-directory: e2e
         timeout-minutes: 5
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install chromium webkit
+
+      # WebKit's system libraries (about 140 MB from Ubuntu's mirror, every run). A mirror
+      # connection stalled twice on Nov 18 with apt waiting forever, so apt gives up on a stalled
+      # connection after 30 s and retries, and the whole install is tried up to 3 times.
+      - name: Install browser system libraries
+        working-directory: e2e
+        timeout-minutes: 8
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+            | sudo tee /etc/apt/apt.conf.d/80-ci-retries > /dev/null
+          for attempt in 1 2 3; do
+            timeout 150 npx playwright install-deps chromium webkit && exit 0
+            echo "::warning::Installing browser system libraries failed or stalled (attempt $attempt of 3)"
+          done
+          exit 1
 
       - name: Run end-to-end tests
         working-directory: e2e
