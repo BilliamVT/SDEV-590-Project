@@ -26,46 +26,18 @@ jobs:
     name: Smoke test production
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    # Playwright's own image: Node, Chromium, WebKit and their system libraries are preinstalled,
+    # so there's no browser download or apt step to stall (two stalls on Nov 18). Keep the version
+    # in step with @playwright/test in e2e/package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: e2e/package-lock.json
-
       - name: Install test dependencies
         working-directory: e2e
         run: npm ci
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
-
-      # Cached after the first run, so this is quick
-      - name: Install browsers
-        working-directory: e2e
-        timeout-minutes: 5
-        run: npx playwright install chromium webkit
-
-      # WebKit's system libraries (about 140 MB from Ubuntu's mirror, every run). A mirror
-      # connection once stalled with apt waiting forever, so apt gives up on a stalled connection
-      # after 30 s and retries, and the whole install is tried up to 3 times.
-      - name: Install browser system libraries
-        working-directory: e2e
-        timeout-minutes: 8
-        run: |
-          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
-            | sudo tee /etc/apt/apt.conf.d/80-ci-retries > /dev/null
-          for attempt in 1 2 3; do
-            timeout 150 npx playwright install-deps chromium webkit && exit 0
-            echo "::warning::Installing browser system libraries failed or stalled (attempt $attempt of 3)"
-          done
-          exit 1
 
       - name: Run the smoke test
         working-directory: e2e
