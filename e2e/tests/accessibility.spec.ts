@@ -58,6 +58,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(confirmSheet(page)).toBeVisible();
       await expectAccessible(page, 'Home, action sheet');
       await confirmSheet(page).getByRole('button', { name: 'Cancel' }).click();
+      // The move sheet, with its day picker (BILLIAMVT-56)
+      await openMenu(today(page), 'Clean gutters');
+      await today(page).getByRole('button', { name: 'Move: Clean gutters' }).click();
+      await expect(confirmSheet(page).getByLabel('New day')).toBeVisible();
+      await expectAccessible(page, 'Home, move sheet');
+      await confirmSheet(page).getByRole('button', { name: 'Cancel' }).click();
 
       await page.goto('/tasks');
       await expect(page.getByText('Vacuum')).toBeVisible();

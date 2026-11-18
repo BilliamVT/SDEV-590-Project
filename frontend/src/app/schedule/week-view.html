@@ -86,6 +86,16 @@
                            Each spoken name starts with the visible text, for voice control (WCAG 2.5.3) -->
                       <div class="menu popover-menu" [attr.aria-label]="'Actions for ' + occurrence.taskName" role="group">
                         @if (occurrence.oneOff) {
+                          @if (occurrence.status === 'PENDING') {
+                            <button
+                              type="button"
+                              [attr.aria-label]="'Move: ' + occurrence.taskName"
+                              [disabled]="saving().has(occurrence.id)"
+                              (click)="startMove(occurrence)"
+                            >
+                              Move
+                            </button>
+                          }
                           <button
                             type="button"
                             [attr.aria-label]="'Back to backlog: ' + occurrence.taskName"
@@ -105,6 +115,14 @@
                           </button>
                         } @else {
                           @if (occurrence.status === 'PENDING') {
+                            <button
+                              type="button"
+                              [attr.aria-label]="'Move: ' + occurrence.taskName"
+                              [disabled]="saving().has(occurrence.id)"
+                              (click)="startMove(occurrence)"
+                            >
+                              Move
+                            </button>
                             <button
                               type="button"
                               [attr.aria-label]="'Skip ' + occurrence.taskName"
@@ -147,5 +165,33 @@
       (confirmed)="confirmDelete()"
       (cancelled)="cancelDelete()"
     />
+
+    <!-- Moves a day without dragging (BILLIAMVT-56): the same action sheet, holding a day picker -->
+    <app-confirm-sheet
+      [open]="pendingMove() !== null"
+      [message]="moveMessage()"
+      confirmLabel="Move"
+      busyLabel="Moving…"
+      confirmClass="primary"
+      [busy]="pendingMove() !== null && saving().has(pendingMove()!.id)"
+      [error]="pendingMove() ? (itemErrors().get(pendingMove()!.id) ?? null) : null"
+      (confirmed)="confirmMove()"
+      (cancelled)="cancelMove()"
+    >
+      @if (pendingMove(); as occurrence) {
+        <div class="field move-field">
+          <label for="move-date">New day</label>
+          <input
+            id="move-date"
+            type="date"
+            autofocus
+            [min]="schedule()?.today ?? ''"
+            [max]="schedule()?.lastViewableDate ?? ''"
+            [value]="moveDate()"
+            (input)="moveDate.set($any($event.target).value)"
+          />
+        </div>
+      }
+    </app-confirm-sheet>
   </section>
 }

@@ -8,6 +8,10 @@ let nextId = 0;
  * centred dialog on wider screens. Built on the browser's <dialog>, which keeps keyboard focus
  * inside, closes on Escape and dims the page. Cancel has the focus, so Enter never deletes by
  * accident. Stays open while busy, and shows an error if the action fails.
+ *
+ * It can also hold a small form, e.g. a day to move to (BILLIAMVT-56): content placed inside goes
+ * between the sentence and the buttons, and an autofocus field there gets the focus instead of
+ * Cancel. {@code confirmClass} "primary" makes the confirm button the app's colour, not red.
  */
 @Component({
   selector: 'app-confirm-sheet',
@@ -21,6 +25,7 @@ export class ConfirmSheet {
   readonly busyLabel = input('Deleting…');
   readonly busy = input(false);
   readonly error = input<string | null>(null);
+  readonly confirmClass = input<'danger' | 'primary'>('danger');
 
   readonly confirmed = output<void>();
   readonly cancelled = output<void>();

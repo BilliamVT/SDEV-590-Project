@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.housework.api.feature.FeatureFlags;
 import com.housework.api.household.Household;
 import com.housework.api.household.HouseholdService;
 import com.housework.api.schedule.ScheduleDtos.OccurrenceResponse;
@@ -40,17 +39,14 @@ public class ScheduleService {
 
 	private final ScheduleGenerator generator;
 
-	private final FeatureFlags flags;
-
 	private final Clock clock;
 
 	ScheduleService(HouseholdService households, TaskRepository tasks, OccurrenceRepository occurrences,
-			ScheduleGenerator generator, FeatureFlags flags, Clock clock) {
+			ScheduleGenerator generator, Clock clock) {
 		this.households = households;
 		this.tasks = tasks;
 		this.occurrences = occurrences;
 		this.generator = generator;
-		this.flags = flags;
 		this.clock = clock;
 	}
 
@@ -109,7 +105,6 @@ public class ScheduleService {
 	 */
 	@Transactional
 	public OccurrenceResponse move(long userId, long occurrenceId, LocalDate date) {
-		flags.requireDragDrop();
 		Household household = households.householdOf(userId);
 		Occurrence occurrence = occurrences.lockInHousehold(occurrenceId, household.getId())
 			.orElseThrow(OccurrenceNotFoundException::new);

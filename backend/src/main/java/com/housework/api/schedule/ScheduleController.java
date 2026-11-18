@@ -48,8 +48,8 @@ class ScheduleController {
 	}
 
 	/**
-	 * Moves one occurrence to another day; returns it (BILLIAMVT-27). 404 while the drag-drop
-	 * flag is off (decision record 0002).
+	 * Moves one occurrence to another day; returns it (BILLIAMVT-27). Released without a flag with
+	 * Move in the ⋯ menu (BILLIAMVT-56); the drag-drop flag only hides the drag UI.
 	 */
 	@PutMapping("/api/occurrences/{id}/date")
 	OccurrenceResponse move(@AuthenticationPrincipal Jwt jwt, @PathVariable long id,

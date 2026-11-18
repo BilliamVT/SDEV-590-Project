@@ -20,7 +20,10 @@ import com.housework.api.IntegrationTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** With the drag-drop flag off, as in production (decision record 0002, BILLIAMVT-27). */
+/**
+ * With the drag-drop flag off, as in production (decision record 0002). The flag only hides the
+ * drag UI (BILLIAMVT-28); moving a day works either way, released with BILLIAMVT-56.
+ */
 @IntegrationTest
 @TestPropertySource(properties = "features.drag-drop=false")
 @Transactional
@@ -43,7 +46,7 @@ class FeatureFlagOffTests {
 	}
 
 	@Test
-	void movingADayLooksLikeItDoesntExistAndChangesNothing() {
+	void movingADayWorksWithTheFlagOff() {
 		String token = registerWithHousehold();
 		long taskId = createDailyTask(token);
 		LocalDate today = LocalDate.now(ZONE);
@@ -56,10 +59,10 @@ class FeatureFlagOffTests {
 			.uri("/api/occurrences/{id}/date", id)
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
 			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"date\": \"%s\"}".formatted(today.plusDays(1)))).hasStatus(404);
+			.content("{\"date\": \"%s\"}".formatted(today.plusDays(1)))).hasStatusOk();
 
 		assertThat(jdbc.sql("select scheduled_date from occurrence where id = ?").param(id).query(LocalDate.class).single())
-			.isEqualTo(today);
+			.isEqualTo(today.plusDays(1));
 	}
 
 	private String registerWithHousehold() {

@@ -63,6 +63,9 @@ export class WeekView {
   protected readonly menuOpen = signal<number | null>(null);
   /** The day the delete action sheet is open for */
   protected readonly choosingDelete = signal<number | null>(null);
+  /** The day the Move sheet is open for, and the day picked (BILLIAMVT-56) */
+  protected readonly choosingMove = signal<number | null>(null);
+  protected readonly moveDate = signal('');
   /**
    * Says that an action found its day already changed, and the week was reloaded (BILLIAMVT-55).
    * Shown as a status message, so screen readers read it too; cleared by the next action.
@@ -106,6 +109,16 @@ export class WeekView {
   });
 
   protected readonly isThisWeek = computed(() => this.weekStart() === this.thisWeek());
+
+  /** The day the move sheet is asking about */
+  protected readonly pendingMove = computed(
+    () => this.schedule()?.occurrences.find((o) => o.id === this.choosingMove()) ?? null,
+  );
+
+  protected readonly moveMessage = computed(() => {
+    const occurrence = this.pendingMove();
+    return occurrence ? `Move ${occurrence.taskName} from ${dayLabel(occurrence.date)} to:` : '';
+  });
 
   constructor() {
     this.load();
@@ -172,9 +185,81 @@ export class WeekView {
     this.choosingDelete.set(occurrence.id);
   }
 
+  /**
+   * Move in the ⋯ menu (BILLIAMVT-56): the way to move a day without dragging (WCAG 2.2 SC 2.5.7).
+   * Opens a sheet with a day picker, starting on the day it's on now.
+   */
+  protected startMove(occurrence: ScheduledOccurrence): void {
+    this.menuOpen.set(null);
+    this.notice.set(null);
+    this.itemErrors.update((errors) => removeError(errors, occurrence.id));
+    this.moveDate.set(occurrence.date);
+    this.choosingMove.set(occurrence.id);
+  }
+
+  /** Move in the sheet: the day leaves its row, and shows on its new day if that's in this week. */
+  protected confirmMove(): void {
+    const occurrence = this.pendingMove();
+    if (!occurrence) {
+      return;
+    }
+    const id = occurrence.id;
+    const date = this.moveDate();
+    if (!date) {
+      this.itemErrors.update((errors) => new Map(errors).set(id, 'Choose a day.'));
+      return;
+    }
+    this.saving.update((ids) => new Set(ids).add(id));
+    this.itemErrors.update((errors) => removeError(errors, id));
+    this.schedules.move(id, date).subscribe({
+      next: (moved) => {
+        const inWeek = moved.date >= this.weekStart() && moved.date <= this.weekEnd();
+        this.schedule.update(
+          (schedule) =>
+            schedule && {
+              ...schedule,
+              occurrences: inWeek
+                ? schedule.occurrences.map((o) => (o.id === id ? moved : o))
+                : schedule.occurrences.filter((o) => o.id !== id),
+            },
+        );
+        this.saving.update((ids) => removeId(ids, id));
+        this.choosingMove.set(null);
+        // A status message, so screen readers read it too
+        this.notice.set(`${moved.taskName} moved to ${dayLabel(moved.date)}.`);
+        if (inWeek) {
+          this.focusMore(id);
+        } else {
+          focusLater(this.host, '#week-title');
+        }
+      },
+      error: (err: unknown) => {
+        if (isStale(err)) {
+          this.choosingMove.set(null);
+          this.failed(occurrence, err);
+        } else {
+          // e.g. a day in the past: the server's message shows in the sheet
+          this.saving.update((ids) => removeId(ids, id));
+          this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
+        }
+      },
+    });
+  }
+
+  /** The move sheet was cancelled: focus goes back to the row's ⋯ button. */
+  protected cancelMove(): void {
+    const id = this.choosingMove();
+    this.choosingMove.set(null);
+    if (id !== null) {
+      this.itemErrors.update((errors) => removeError(errors, id));
+      this.focusMore(id);
+    }
+  }
+
   /** Opens or closes a day's ⋯ menu; only one is open at a time. */
   protected toggleMenu(occurrence: ScheduledOccurrence): void {
     this.choosingDelete.set(null);
+    this.choosingMove.set(null);
     this.menuOpen.update((open) => (open === occurrence.id ? null : occurrence.id));
   }
 

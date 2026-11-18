@@ -39,8 +39,8 @@ const schedule = (from: string, to: string, occurrences: ScheduledOccurrence[] =
 const ME = 1;
 
 /** The delete action sheet (BILLIAMVT-49): whether it's open, and what it asks. */
-const sheetOpen = (element: HTMLElement) => element.querySelector('dialog.sheet')!.hasAttribute('open');
-const sheetMessage = (element: HTMLElement) => element.querySelector('dialog.sheet .message')?.textContent?.trim();
+const sheetOpen = (element: HTMLElement) => element.querySelector('dialog.sheet[open]') !== null;
+const sheetMessage = (element: HTMLElement) => element.querySelector('dialog.sheet[open] .message')?.textContent?.trim();
 
 describe('WeekView', () => {
   // Wednesday Nov 11, 2026: this week runs Sunday Nov 8 to Saturday Nov 14
@@ -55,8 +55,14 @@ describe('WeekView', () => {
     changeStatus: (id: number, status: OccurrenceStatus) => Observable<ScheduledOccurrence> = () => NEVER,
     remove: (id: number) => Observable<void> = () => of(undefined),
     deleteItem: (id: number) => Observable<void> = () => of(undefined),
+    move: (id: number, date: string) => Observable<ScheduledOccurrence> = () => NEVER,
   ) {
-    const schedules = { between: vi.fn(between), changeStatus: vi.fn(changeStatus), delete: vi.fn(remove) };
+    const schedules = {
+      between: vi.fn(between),
+      changeStatus: vi.fn(changeStatus),
+      delete: vi.fn(remove),
+      move: vi.fn(move),
+    };
     const backlog = { delete: vi.fn(deleteItem) };
     await TestBed.configureTestingModule({
       imports: [WeekView],
@@ -353,7 +359,8 @@ describe('WeekView', () => {
 
       expect(element.querySelector('.menu')).toBeNull();
       await click('More for Dishes on Wednesday, Nov 11');
-      expect(menu()).toEqual(['Skip', 'Delete']);
+      // Move too, since BILLIAMVT-56
+      expect(menu()).toEqual(['Move', 'Skip', 'Delete']);
       // Only one menu at a time
       await click('More for Vacuum on Wednesday, Nov 11');
       expect(menu()).toEqual(['Delete']);
@@ -423,6 +430,7 @@ describe('WeekView', () => {
       expect(button('Mark Hang shelves done, Wednesday, Nov 11')).toBeDefined();
       await openMenu(click);
       expect([...element.querySelectorAll('.menu button')].map((b) => b.textContent?.trim())).toEqual([
+        'Move',
         'Back to backlog',
         'Delete',
       ]);
@@ -606,6 +614,142 @@ describe('WeekView', () => {
 
       expect(notice(element)).toBeUndefined();
       expect(element.querySelector('.item-error')).not.toBeNull();
+    });
+  });
+
+  describe('moving a day with the menu (BILLIAMVT-56)', () => {
+    const vacuum = occurrence(1, 'Vacuum', '2026-11-11');
+    const withVacuum = (from: string, to: string) => of(schedule(from, to, [vacuum]));
+    const moveSheet = (element: HTMLElement) => element.querySelectorAll<HTMLDialogElement>('dialog.sheet')[1];
+    const inSheet = (element: HTMLElement, text: string) =>
+      [...moveSheet(element).querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!;
+    const dateField = (element: HTMLElement) => element.querySelector<HTMLInputElement>('#move-date')!;
+    const notice = (element: HTMLElement) => element.querySelector('.notice[role="status"]')?.textContent?.trim();
+    const openMove = async (click: (name: string) => Promise<void>) => {
+      await click('More for Vacuum on Wednesday, Nov 11');
+      await click('Move: Vacuum');
+    };
+    const pick = async (element: HTMLElement, fixture: { whenStable: () => Promise<unknown> }, date: string) => {
+      const field = dateField(element);
+      field.value = date;
+      field.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+    };
+
+    it("is in a pending day's menu, for recurring tasks and one-off items, but not done days", async () => {
+      const done = occurrence(2, 'Dishes', '2026-11-11', { status: 'DONE', completedById: ME, completedByName: 'Pat' });
+      const shelves = occurrence(3, 'Hang shelves', '2026-11-11', { oneOff: true });
+      const { element, click } = await render((from, to) => of(schedule(from, to, [vacuum, done, shelves])));
+      const menu = () => [...element.querySelectorAll('.menu button')].map((b) => b.textContent?.trim());
+
+      await click('More for Vacuum on Wednesday, Nov 11');
+      expect(menu()).toEqual(['Move', 'Skip', 'Delete']);
+      await click('More for Dishes on Wednesday, Nov 11');
+      expect(menu()).toEqual(['Delete']);
+      await click('More for Hang shelves on Wednesday, Nov 11');
+      expect(menu()).toEqual(['Move', 'Back to backlog', 'Delete']);
+    });
+
+    it('asks for a day, from today to the viewing limit, starting on the day it is on', async () => {
+      const { element, click } = await render(withVacuum);
+
+      await openMove(click);
+
+      expect(sheetOpen(element)).toBe(true);
+      expect(sheetMessage(element)).toBe('Move Vacuum from Wednesday, Nov 11 to:');
+      expect(dateField(element).value).toBe('2026-11-11');
+      expect(dateField(element).min).toBe('2026-11-11');
+      expect(dateField(element).max).toBe('2028-11-11');
+      expect(inSheet(element, 'Move').classList).toContain('primary');
+      expect(element.querySelector('.menu')).toBeNull();
+    });
+
+    it('moves the row to its new day in this week, and says so', async () => {
+      const { schedules, element, click, fixture } = await render(withVacuum, undefined, undefined, undefined, (id, date) =>
+        of({ ...vacuum, date }),
+      );
+      await openMove(click);
+      await pick(element, fixture, '2026-11-13');
+
+      inSheet(element, 'Move').click();
+      await fixture.whenStable();
+
+      expect(schedules.move).toHaveBeenCalledWith(1, '2026-11-13');
+      expect(sheetOpen(element)).toBe(false);
+      expect(element.querySelectorAll('.day')[3].querySelector('.occurrence')).toBeNull();
+      expect(element.querySelectorAll('.day')[5].querySelector('.occurrence')?.textContent).toContain('Vacuum');
+      expect(notice(element)).toBe('Vacuum moved to Friday, Nov 13.');
+    });
+
+    it('takes the row off this week when it moves to another week', async () => {
+      const { element, click, fixture } = await render(withVacuum, undefined, undefined, undefined, (id, date) =>
+        of({ ...vacuum, date }),
+      );
+      await openMove(click);
+      await pick(element, fixture, '2026-11-20');
+
+      inSheet(element, 'Move').click();
+      await fixture.whenStable();
+
+      expect(element.querySelector('.occurrence')).toBeNull();
+      expect(notice(element)).toBe('Vacuum moved to Friday, Nov 20.');
+    });
+
+    it("shows the server's message in the sheet, which stays open", async () => {
+      const { element, click, fixture } = await render(withVacuum, undefined, undefined, undefined, () =>
+        throwError(() => new HttpErrorResponse({ status: 400, error: { detail: 'Pick today or a later day.' } })),
+      );
+      await openMove(click);
+
+      inSheet(element, 'Move').click();
+      await fixture.whenStable();
+
+      expect(sheetOpen(element)).toBe(true);
+      expect(moveSheet(element).querySelector('[role="alert"]')?.textContent).toBe('Pick today or a later day.');
+    });
+
+    it('needs a day', async () => {
+      const { schedules, element, click, fixture } = await render(withVacuum);
+      await openMove(click);
+      await pick(element, fixture, '');
+
+      inSheet(element, 'Move').click();
+      await fixture.whenStable();
+
+      expect(schedules.move).not.toHaveBeenCalled();
+      expect(moveSheet(element).querySelector('[role="alert"]')?.textContent).toBe('Choose a day.');
+    });
+
+    it('reloads the week with a notice when the day changed meanwhile (BILLIAMVT-55)', async () => {
+      let calls = 0;
+      const doneBySam = { ...vacuum, status: 'DONE' as const, completedById: 2, completedByName: 'Sam' };
+      const { element, click, fixture } = await render(
+        (from, to) => of(schedule(from, to, [calls++ === 0 ? vacuum : doneBySam])),
+        undefined,
+        undefined,
+        undefined,
+        () => throwError(() => new HttpErrorResponse({ status: 409 })),
+      );
+      await openMove(click);
+
+      inSheet(element, 'Move').click();
+      await fixture.whenStable();
+
+      expect(sheetOpen(element)).toBe(false);
+      expect(notice(element)).toBe('Sam already marked Vacuum done. Your week is up to date.');
+    });
+
+    it('cancels, and focus goes back to the ⋯ button', async () => {
+      const { schedules, element, click, fixture } = await render(withVacuum);
+      await openMove(click);
+
+      inSheet(element, 'Cancel').click();
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(schedules.move).not.toHaveBeenCalled();
+      expect(sheetOpen(element)).toBe(false);
+      expect(document.activeElement?.getAttribute('aria-label')).toBe('More for Vacuum on Wednesday, Nov 11');
     });
   });
 
