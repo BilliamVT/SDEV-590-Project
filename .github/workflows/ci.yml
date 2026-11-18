@@ -167,17 +167,21 @@ jobs:
         run: npx playwright install chromium webkit
 
       # WebKit's system libraries (about 140 MB from Ubuntu's mirror, every run). A mirror
-      # connection stalled twice on Nov 18 with apt waiting forever, so apt gives up on a stalled
-      # connection after 30 s and retries, and the whole install is tried up to 3 times.
+      # connection stalled twice on Nov 18 with apt waiting forever. apt now gives up on a stalled
+      # connection after 30 s and retries, waits up to 2 minutes for the package lock instead of
+      # failing at once, and the whole install is tried up to 3 times. No per-try `timeout`: it
+      # stopped npx but left apt running and holding the lock, so every retry failed instantly.
       - name: Install browser system libraries
         working-directory: e2e
         timeout-minutes: 8
         run: |
-          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+          printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' \
+            'Acquire::https::Timeout "30";' 'DPkg::Lock::Timeout "120";' \
             | sudo tee /etc/apt/apt.conf.d/80-ci-retries > /dev/null
           for attempt in 1 2 3; do
-            timeout 150 npx playwright install-deps chromium webkit && exit 0
-            echo "::warning::Installing browser system libraries failed or stalled (attempt $attempt of 3)"
+            npx playwright install-deps chromium webkit && exit 0
+            echo "::warning::Installing browser system libraries failed (attempt $attempt of 3)"
+            sleep 10
           done
           exit 1
 
