@@ -160,9 +160,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
 
-      # --with-deps also installs the system libraries WebKit needs; cached browsers aren't downloaded again
+      # --with-deps also installs the system libraries WebKit needs; cached browsers aren't downloaded again.
+      # Usually 30-60 s. A stalled download once hung here until the job's 20-minute timeout (Sprint 4
+      # retro), so it fails after 5 minutes instead; re-run the failed job.
       - name: Install browsers
         working-directory: e2e
+        timeout-minutes: 5
         run: npx playwright install --with-deps chromium webkit
 
       - name: Run end-to-end tests
