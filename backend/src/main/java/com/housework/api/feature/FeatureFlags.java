@@ -7,14 +7,10 @@ package com.housework.api.feature;
  */
 public interface FeatureFlags {
 
-	/** Moving an occurrence to another day (BILLIAMVT-27, 28). */
+	/**
+	 * Dragging a day to another day in the week view (BILLIAMVT-28). The front end hides the drag
+	 * UI while it's off; the move API itself was released with BILLIAMVT-56.
+	 */
 	boolean dragDrop();
-
-	/** Throws {@link FeatureDisabledException} (404) unless drag-and-drop is on. */
-	default void requireDragDrop() {
-		if (!dragDrop()) {
-			throw new FeatureDisabledException();
-		}
-	}
 
 }

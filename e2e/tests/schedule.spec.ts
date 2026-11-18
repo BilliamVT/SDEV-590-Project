@@ -18,6 +18,30 @@ test('a new daily task shows today, and can be marked done and undone', async ({
   await expect(today(page).getByRole('button', { name: 'Mark Vacuum done' })).toBeVisible();
 });
 
+test('a day can be moved to another day from its menu, without dragging (BILLIAMVT-56)', async ({ page }) => {
+  await signUpWithHousehold(page, 'Pat');
+  await addTask(page, 'Vacuum', 'Every day');
+
+  await openMenu(today(page), 'Vacuum');
+  await today(page).getByRole('button', { name: 'Move: Vacuum' }).click();
+  const sheet = confirmSheet(page);
+  await expect(sheet).toContainText('Move Vacuum from');
+  // The picker starts on the day it's on now (the household's today); move it to the next day
+  const field = sheet.getByLabel('New day');
+  const tomorrow = await field.evaluate((input: HTMLInputElement) => {
+    const date = new Date(`${input.value}T12:00:00`);
+    date.setDate(date.getDate() + 1);
+    return date.toLocaleDateString('en-CA');
+  });
+  await field.fill(tomorrow);
+  await sheet.getByRole('button', { name: 'Move' }).click();
+
+  await expect(page.getByRole('status').filter({ hasText: /^Vacuum moved to \w+, \w{3} \d{1,2}\.$/ })).toBeVisible();
+  await expect(sheet).toBeHidden();
+  // Only today's day moved; tomorrow may be in next week, so check today
+  await expect(today(page).getByText('Vacuum')).toBeHidden();
+});
+
 test('a weekly task on several days shows on exactly those days', async ({ page }) => {
   await signUpWithHousehold(page, 'Pat');
 

@@ -82,6 +82,8 @@ Built as planned, in the `feature` package, with three differences:
 - **The front end doesn't wait for the flags.** `FeatureFlagsService` starts loading them at startup and treats every flag as off until they arrive, or if the request fails. Blocking the first page on `GET /api/features` would show a blank screen for up to a minute while the free Render instance wakes up.
 - **`GET /api/features` needs no login**, so it can be read before signing in. It says nothing about any user.
 
+**Update (BILLIAMVT-56, 2026-11-18):** the move API left the flag when Move shipped in the ⋯ menu, the non-drag way to move required by WCAG 2.2 SC 2.5.7. Release toggles come off each part as it's finished, so `dragDrop` now hides only the drag UI (BILLIAMVT-28). The backend's 404-while-off check was removed with it, since nothing else used it; add it back for the next unreleased endpoint (e.g. task dependencies, BILLIAMVT-29).
+
 ## Sources
 
 - [Spring Boot reference: externalized configuration and relaxed binding](https://docs.spring.io/spring-boot/reference/features/external-config.html)

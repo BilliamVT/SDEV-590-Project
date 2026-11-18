@@ -9,6 +9,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties("features")
 record FeatureProperties(
-		/** Moving an occurrence to another day (BILLIAMVT-27, 28) */
+		/** The drag-and-drop UI (BILLIAMVT-28); the move API itself is released (BILLIAMVT-56) */
 		boolean dragDrop) {
 }

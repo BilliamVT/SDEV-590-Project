@@ -20,6 +20,11 @@ export class ScheduleService {
     return this.http.put<ScheduledOccurrence>(`${environment.apiUrl}/api/occurrences/${id}/status`, { status });
   }
 
+  /** Moves one day of a task to another day, yyyy-mm-dd; returns it (BILLIAMVT-27, 56). */
+  move(id: number, date: string): Observable<ScheduledOccurrence> {
+    return this.http.put<ScheduledOccurrence>(`${environment.apiUrl}/api/occurrences/${id}/date`, { date });
+  }
+
   /** Deletes one occurrence for good (BILLIAMVT-25). */
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${environment.apiUrl}/api/occurrences/${id}`);

@@ -22,6 +22,16 @@ class Host {
   cancelled = 0;
 }
 
+/** A sheet holding a small form, as Move does (BILLIAMVT-56). */
+@Component({
+  imports: [ConfirmSheet],
+  template: `<app-confirm-sheet [open]="true" message="Move Vacuum to:" confirmLabel="Move" confirmClass="primary">
+    <label for="day">New day</label>
+    <input id="day" type="date" autofocus />
+  </app-confirm-sheet>`,
+})
+class FormHost {}
+
 describe('ConfirmSheet (BILLIAMVT-49)', () => {
   async function render() {
     const fixture = TestBed.createComponent(Host);
@@ -93,5 +103,17 @@ describe('ConfirmSheet (BILLIAMVT-49)', () => {
       host.error.set("The server couldn't be reached.");
     });
     expect(dialog.querySelector('[role="alert"]')?.textContent).toBe("The server couldn't be reached.");
+  });
+
+  it('can hold a form between the question and the buttons, with a confirm button that is not red (BILLIAMVT-56)', async () => {
+    const fixture = TestBed.createComponent(FormHost);
+    await fixture.whenStable();
+    const dialog = (fixture.nativeElement as HTMLElement).querySelector('dialog')!;
+    const panel = [...dialog.querySelector('.panel')!.children].map((c) => c.tagName.toLowerCase());
+
+    expect(panel).toEqual(['p', 'label', 'input', 'div']);
+    const move = [...dialog.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Move')!;
+    expect(move.classList).toContain('primary');
+    expect(move.classList).not.toContain('danger');
   });
 });

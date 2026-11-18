@@ -1,11 +1,12 @@
 <dialog #dialog class="sheet" [attr.aria-labelledby]="messageId" (cancel)="onCancelEvent($event)" (click)="onDialogClick($event)">
   <div class="panel">
     <p class="message" [id]="messageId">{{ message() }}</p>
+    <ng-content />
     @if (error(); as text) {
       <p class="form-error" role="alert">{{ text }}</p>
     }
     <div class="buttons">
-      <button type="button" class="danger" [disabled]="busy()" (click)="confirmed.emit()">
+      <button type="button" [class]="confirmClass()" [disabled]="busy()" (click)="confirmed.emit()">
         {{ busy() ? busyLabel() : confirmLabel() }}
       </button>
       <button type="button" class="cancel" autofocus [disabled]="busy()" (click)="cancel()">Cancel</button>

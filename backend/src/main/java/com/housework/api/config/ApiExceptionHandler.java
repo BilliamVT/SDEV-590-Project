@@ -25,7 +25,6 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.housework.api.auth.EmailAlreadyRegisteredException;
 import com.housework.api.auth.IncorrectPasswordException;
-import com.housework.api.feature.FeatureDisabledException;
 import com.housework.api.household.AlreadyInHouseholdException;
 import com.housework.api.household.InvalidTimeZoneException;
 import com.housework.api.household.InviteCodeNotFoundException;
@@ -109,12 +108,6 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(OccurrenceNotMovableException.class)
 	ProblemDetail occurrenceNotMovable(OccurrenceNotMovableException ex, HttpServletRequest request) {
 		return problem(request, HttpStatus.CONFLICT, ex, "occurrence can't be moved");
-	}
-
-	/** An unreleased feature's endpoint with its flag off: looks like it doesn't exist (decision record 0002). */
-	@ExceptionHandler(FeatureDisabledException.class)
-	ProblemDetail featureDisabled(FeatureDisabledException ex, HttpServletRequest request) {
-		return problem(request, HttpStatus.NOT_FOUND, ex, "feature off");
 	}
 
 	/** Spring's own exceptions; the response body is unchanged, only the reason is added. */
