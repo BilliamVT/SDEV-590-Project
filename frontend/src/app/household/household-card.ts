@@ -39,6 +39,12 @@ export class HouseholdCard {
   protected readonly format = formatInviteCode;
 
   constructor() {
+    this.load();
+  }
+
+  /** Also the Try again button when loading failed (BILLIAMVT-53). */
+  protected load(): void {
+    this.error.set(null);
     this.households.load().subscribe({
       next: (household) => {
         this.household.set(household);

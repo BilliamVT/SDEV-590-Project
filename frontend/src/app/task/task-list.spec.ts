@@ -1,6 +1,7 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 
 import { Task } from './task.models';
 import { TaskList } from './task-list';
@@ -27,9 +28,9 @@ const sheetOpen = (element: HTMLElement) => element.querySelector('dialog.sheet'
 const sheetMessage = (element: HTMLElement) => element.querySelector('dialog.sheet .message')?.textContent?.trim();
 
 describe('TaskList', () => {
-  async function render(tasks: Task[]) {
+  async function render(tasks: Task[], list: () => Observable<Task[]> = () => of(tasks)) {
     const service = {
-      list: vi.fn(() => of(tasks)),
+      list: vi.fn(list),
       pause: vi.fn((id: number) => of({ ...tasks.find((t) => t.id === id)!, active: false })),
       resume: vi.fn((id: number) => of({ ...tasks.find((t) => t.id === id)!, active: true })),
       delete: vi.fn(() => of(undefined)),
@@ -50,7 +51,7 @@ describe('TaskList', () => {
       [...row(name).querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!.click();
       await fixture.whenStable();
     };
-    return { service, element, row, click, sheetButton };
+    return { service, fixture, element, row, click, sheetButton };
   }
 
   it('lists the tasks with their schedule, minutes and an edit link', async () => {
@@ -111,6 +112,20 @@ describe('TaskList', () => {
     await sheetButton('Delete');
     expect(service.delete).toHaveBeenCalledWith(1);
     expect([...element.querySelectorAll('.name')].map((n) => n.textContent)).toEqual(['Vacuum']);
+  });
+
+  it('offers Try again when the list failed to load (BILLIAMVT-53)', async () => {
+    let calls = 0;
+    const vacuum = task(1, 'Vacuum');
+    const { element, fixture } = await render([vacuum], () =>
+      ++calls === 1 ? throwError(() => new HttpErrorResponse({ status: 0 })) : of([vacuum]),
+    );
+
+    element.querySelector<HTMLButtonElement>('button.retry')!.click();
+    await fixture.whenStable();
+
+    expect(element.querySelector('.form-error')).toBeNull();
+    expect(element.querySelector('.task .name')?.textContent).toBe('Vacuum');
   });
 
   it('invites adding a first task', async () => {

@@ -18,6 +18,10 @@
 
     @if (error()) {
       <p class="form-error" role="alert">{{ error() }}</p>
+      @if (!noHousehold()) {
+        <!-- Try again: the home-screen app has no reload button (BILLIAMVT-53) -->
+        <button type="button" class="retry" (click)="retry()">Try again</button>
+      }
     } @else if (loading() && !schedule()) {
       <p class="hint">Loading your week… The server sleeps when it isn't in use, so this can take up to a minute.</p>
     } @else {

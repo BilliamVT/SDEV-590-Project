@@ -87,6 +87,12 @@ export class Backlog {
    * Called after the week view changes (a removed day puts its item back here), or the household
    * changes. {@code after} runs once the list has loaded.
    */
+  /** Loading the backlog failed: try again (BILLIAMVT-53). */
+  protected retry(): void {
+    this.error.set(null);
+    this.reload();
+  }
+
   reload(after?: () => void): void {
     this.notice.set(null);
     this.backlog.list().subscribe({

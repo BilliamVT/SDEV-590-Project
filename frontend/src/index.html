@@ -5,8 +5,19 @@
   <title>Housework Scheduler</title>
   <base href="/">
   <meta name="color-scheme" content="light dark">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <!-- viewport-fit=cover: full screen on phones with a notch; styles keep content in the safe area -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Your household's week of chores, shared.">
+  <!-- Home screen app (BILLIAMVT-53). Paths are relative, so they work under GitHub Pages' /SDEV-590-Project/ -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121c1b" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-title" content="Housework">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 </head>
 <body>
   <app-root></app-root>

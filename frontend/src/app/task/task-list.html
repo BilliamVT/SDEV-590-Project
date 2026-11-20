@@ -11,6 +11,10 @@
 
 @if (error()) {
   <p class="form-error" role="alert">{{ error() }}</p>
+  @if (list() === null) {
+    <!-- Try again: the home-screen app has no reload button (BILLIAMVT-53) -->
+    <button type="button" class="retry" (click)="load()">Try again</button>
+  }
 }
 
 @if (list(); as tasks) {

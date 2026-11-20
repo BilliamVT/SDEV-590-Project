@@ -47,4 +47,6 @@
   </div>
 } @else if (error()) {
   <p class="form-error" role="alert">{{ error() }}</p>
+  <!-- Try again: the home-screen app has no reload button (BILLIAMVT-53) -->
+  <button type="button" class="retry" (click)="load()">Try again</button>
 }

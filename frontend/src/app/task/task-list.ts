@@ -35,6 +35,12 @@ export class TaskList {
     | undefined;
 
   constructor() {
+    this.load();
+  }
+
+  /** Also the Try again button when loading failed (BILLIAMVT-53). */
+  protected load(): void {
+    this.error.set(null);
     this.tasks.list().subscribe({
       next: (tasks) => this.list.set(tasks),
       error: (err: unknown) => this.error.set(errorMessage(err)),
