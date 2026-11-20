@@ -58,6 +58,17 @@
                   "with": "src/environments/environment.development.ts"
                 }
               ]
+            },
+            "lan": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.lan.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -70,6 +81,12 @@
             },
             "development": {
               "buildTarget": "frontend:build:development"
+            },
+            "lan": {
+              "buildTarget": "frontend:build:lan",
+              "host": "0.0.0.0",
+              "port": 4300,
+              "proxyConfig": "proxy.lan.json"
             }
           },
           "defaultConfiguration": "development"

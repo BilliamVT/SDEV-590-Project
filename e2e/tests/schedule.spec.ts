@@ -36,10 +36,71 @@ test('a day can be moved to another day from its menu, without dragging (BILLIAM
   await field.fill(tomorrow);
   await sheet.getByRole('button', { name: 'Move' }).click();
 
-  await expect(page.getByRole('status').filter({ hasText: /^Vacuum moved to \w+, \w{3} \d{1,2}\.$/ })).toBeVisible();
+  // The confirmation is a toast at the bottom (BILLIAMVT-28)
+  await expect(page.locator('.toast').getByText(/^Vacuum moved to \w+, \w{3} \d{1,2}\.$/)).toBeVisible();
   await expect(sheet).toBeHidden();
   // Only today's day moved; tomorrow may be in next week, so check today
   await expect(today(page).getByText('Vacuum')).toBeHidden();
+});
+
+test('a day can be dragged to another day (BILLIAMVT-28, drag-drop flag on locally)', async ({ page, browserName }) => {
+  // A mouse drag; touch (press and hold) is checked on a real iPhone
+  test.skip(browserName !== 'chromium', 'Mouse drag in Chromium only');
+  // Tall enough that today and Saturday are both on screen: the mouse can't drag past the window
+  await page.setViewportSize({ width: 1280, height: 1100 });
+  await signUpWithHousehold(page, 'Pat');
+  await addTask(page, 'Vacuum', 'Every day');
+
+  // Drag today's Vacuum onto the last day of the week (Saturday), unless today is Saturday
+  const days = page.locator('.day');
+  const last = days.last();
+  test.skip(await last.evaluate((d) => d.classList.contains('today')), 'Today is the last day of the week');
+  const row = today(page).locator('.occurrence').filter({ hasText: 'Vacuum' });
+  const from = (await row.boundingBox())!;
+  const to = (await last.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 + 10, { steps: 5 });
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 20 });
+  // Only the day under the cursor is outlined: that's where it will land
+  await expect(page.locator('.day.drop-over')).toHaveCount(1);
+  await expect(last).toHaveClass(/drop-over/);
+  await page.mouse.up();
+
+  await expect(page.locator('.toast').getByText(/^Vacuum moved to Saturday, \w{3} \d{1,2}\.$/)).toBeVisible();
+  await expect(today(page).getByText('Vacuum')).toBeHidden();
+  // The daily task is on Saturday anyway, so Saturday now has two
+  await expect(last.locator('.occurrence').filter({ hasText: 'Vacuum' })).toHaveCount(2);
+
+  // Undo on the toast puts it back
+  await page.locator('.toast').getByRole('button', { name: /^Undo: Vacuum moved to Saturday/ }).click();
+  await expect(page.locator('.toast').getByText(/^Vacuum moved back to /)).toBeVisible();
+  await expect(today(page).getByText('Vacuum')).toBeVisible();
+  await expect(last.locator('.occurrence').filter({ hasText: 'Vacuum' })).toHaveCount(1);
+});
+
+test('letting go of a dragged day outside any day cancels the move (BILLIAMVT-28)', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Mouse drag in Chromium only');
+  await page.setViewportSize({ width: 1280, height: 1100 });
+  await signUpWithHousehold(page, 'Pat');
+  await addTask(page, 'Vacuum', 'Every day');
+
+  // Over Saturday first, then below the week, onto the backlog, and let go there
+  const row = today(page).locator('.occurrence').filter({ hasText: 'Vacuum' });
+  const from = (await row.boundingBox())!;
+  const saturday = (await page.locator('.day').last().boundingBox())!;
+  const below = (await backlog(page).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 + 10, { steps: 5 });
+  await page.mouse.move(saturday.x + saturday.width / 2, saturday.y + saturday.height / 2, { steps: 10 });
+  await page.mouse.move(below.x + below.width / 2, below.y + 40, { steps: 10 });
+  // No day is outlined: letting go here cancels
+  await expect(page.locator('.day.drop-over')).toHaveCount(0);
+  await page.mouse.up();
+
+  await expect(today(page).getByText('Vacuum')).toBeVisible();
+  await expect(page.locator('.toast').getByText(/moved to/)).toHaveCount(0);
 });
 
 test('a weekly task on several days shows on exactly those days', async ({ page }) => {

@@ -10,5 +10,25 @@
 <main>
   <router-outlet />
 </main>
+<!-- A short confirmation floating at the bottom, e.g. after a move, maybe with Undo (BILLIAMVT-28).
+     It stays while touched, hovered or focused. Screen readers hear the message from the announcer below, so only the button is shown to them -->
+<div
+  class="toast"
+  [class.shown]="toast.shown()"
+  (pointerenter)="toast.hold('pointer', true)"
+  (pointerleave)="toast.hold('pointer', false)"
+  (focusin)="toast.hold('focus', true)"
+  (focusout)="toast.hold('focus', false)"
+>
+  @if (toast.message(); as text) {
+    <span class="toast-icon" aria-hidden="true">✓</span>
+    <span class="toast-text" aria-hidden="true">{{ text }}</span>
+    @if (toast.action(); as action) {
+      <button type="button" class="toast-action" [attr.aria-label]="action.label + ': ' + text" (click)="toast.act()">
+        {{ action.label }}
+      </button>
+    }
+  }
+</div>
 <!-- What just changed, for screen readers (BILLIAMVT-49); hidden on screen -->
 <p class="visually-hidden" aria-live="polite">{{ announcer.message() }}</p>

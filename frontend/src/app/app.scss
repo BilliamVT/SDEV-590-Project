@@ -42,3 +42,90 @@ h1 {
     padding-inline: var(--space-2);
   }
 }
+
+// A toast (BILLIAMVT-28): floats above the content at the bottom, clear of the iPhone home bar, so
+// it never moves the page. Sized like a snackbar (at least 48 px, nearly full width on a phone) with
+// a tick, and it rises slightly as it appears, so it's noticed. When hidden it keeps its last text
+// while it fades, then is hidden from screen readers and the keyboard too (visibility).
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  width: min(calc(100% - 2 * var(--space-4)), 28rem);
+  min-height: 3rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-text);
+  color: var(--color-background);
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+  transform: translate(-50%, 0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+
+  // Takes touches only while shown, so a finger on it holds it open
+  &.shown {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transform: translate(-50%, var(--space-3));
+    // Hidden only once the fade has finished
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease,
+      visibility 0s linear 0.2s;
+
+    &.shown {
+      transform: translate(-50%, 0);
+      transition-delay: 0s;
+    }
+  }
+}
+
+.toast-text {
+  flex: 1;
+}
+
+// Undo: an outlined button in the toast's own colours, full touch size
+.toast-action {
+  flex: none;
+  min-height: var(--touch);
+  margin-block: calc(-1 * var(--space-2));
+  padding-inline: var(--space-3);
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+// The tick in a round badge, in the app's teal
+.toast-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--color-done);
+  color: var(--color-on-primary);
+  font-size: var(--text-sm);
+}
