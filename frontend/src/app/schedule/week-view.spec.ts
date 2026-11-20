@@ -894,7 +894,12 @@ describe('WeekView', () => {
       try {
         const touch = (type: string, target: EventTarget) => {
           const event = new Event(type, { bubbles: true, cancelable: true });
-          Object.defineProperty(event, 'touches', { value: type === 'touchstart' ? [{}] : [] });
+          // A full touch point: the CDK's own listener on the row reads it too
+          const point = { clientX: 10, clientY: 10, pageX: 10, pageY: 10, screenX: 10, screenY: 10, identifier: 0, target };
+          const down = type === 'touchstart' || type === 'touchmove' ? [point] : [];
+          Object.defineProperty(event, 'touches', { value: down });
+          Object.defineProperty(event, 'targetTouches', { value: down });
+          Object.defineProperty(event, 'changedTouches', { value: [point] });
           target.dispatchEvent(event);
           return event.defaultPrevented;
         };
