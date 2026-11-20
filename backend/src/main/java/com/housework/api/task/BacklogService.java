@@ -55,11 +55,23 @@ public class BacklogService {
 		return tasks.findOpenItems(household.getId()).stream().map(ItemResponse::from).toList();
 	}
 
+	/**
+	 * Adds an item to the backlog, or with a date straight onto that day (BILLIAMVT-59). Both happen
+	 * in one transaction, so a refused date creates nothing.
+	 */
 	@Transactional
 	public ItemResponse create(long userId, CreateItemRequest request) {
 		Household household = households.householdOf(userId);
+		if (request.date() != null) {
+			checkScheduleDate(household, request.date());
+		}
 		Task item = tasks.save(new Task(household.getId(), request.name().strip(), null, null, request.estimatedMinutes()));
-		log.info("User {} added backlog item {} in household {}", userId, item.getId(), household.getId());
+		if (request.date() != null) {
+			occurrences.place(item.getId(), request.date(), OccurrenceStatus.PENDING.name(), null, null);
+			log.info("User {} added one-time task {} on a day in household {}", userId, item.getId(), household.getId());
+		} else {
+			log.info("User {} added backlog item {} in household {}", userId, item.getId(), household.getId());
+		}
 		return ItemResponse.from(item);
 	}
 
@@ -68,6 +80,13 @@ public class BacklogService {
 	public void schedule(long userId, long itemId, LocalDate date) {
 		Household household = households.householdOf(userId);
 		Task item = openItem(household, itemId);
+		checkScheduleDate(household, date);
+		occurrences.place(item.getId(), date, OccurrenceStatus.PENDING.name(), null, null);
+		log.info("User {} scheduled backlog item {}", userId, item.getId());
+	}
+
+	/** A day an item can be put on: today (the household's) up to 2 years ahead. */
+	private void checkScheduleDate(Household household, LocalDate date) {
 		LocalDate today = today(household);
 		if (date.isBefore(today)) {
 			throw new InvalidScheduleException("Choose a day from today on.");
@@ -75,8 +94,6 @@ public class BacklogService {
 		if (date.isAfter(today.plusYears(MAX_YEARS_AHEAD))) {
 			throw new InvalidScheduleException("Choose a day within 2 years of today.");
 		}
-		occurrences.place(item.getId(), date, OccurrenceStatus.PENDING.name(), null, null);
-		log.info("User {} scheduled backlog item {}", userId, item.getId());
 	}
 
 	/** Marks an open item done on today or an earlier day; it then shows in the week view as done. */

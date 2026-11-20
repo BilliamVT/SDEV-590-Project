@@ -119,6 +119,48 @@ class BacklogTests {
 	}
 
 	@Test
+	void addingWithADatePutsItStraightOnThatDay() {
+		String token = registerWithHousehold("pat@example.com");
+
+		MvcTestResult vacuum = add(token,
+				"{\"name\": \"Vacuum\", \"estimatedMinutes\": 20, \"date\": \"%s\"}".formatted(today.plusDays(2)));
+		entityManager.flush();
+
+		// BILLIAMVT-59: one request, no backlog step
+		assertThat(vacuum).hasStatus(201);
+		assertThat(names(token)).isEmpty();
+		List<Map<String, Object>> week = week(token);
+		assertThat(week).hasSize(1);
+		assertThat(week.getFirst()).containsEntry("taskName", "Vacuum")
+			.containsEntry("date", today.plusDays(2).toString())
+			.containsEntry("status", "PENDING")
+			.containsEntry("estimatedMinutes", 20)
+			.containsEntry("oneOff", true);
+		// Like any scheduled item, deleting the day puts it back in the backlog
+		assertThat(mvc.delete()
+			.uri("/api/occurrences/{id}", occurrenceOf(id(vacuum)))
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + token)).hasStatus2xxSuccessful();
+		entityManager.flush();
+		entityManager.clear();
+		assertThat(names(token)).containsExactly("Vacuum");
+	}
+
+	@Test
+	void addingWithADateFollowsTheSchedulingRulesAndCreatesNothingWhenRefused() {
+		String token = registerWithHousehold("pat@example.com");
+
+		MvcTestResult past = add(token, "{\"name\": \"Vacuum\", \"date\": \"%s\"}".formatted(today.minusDays(1)));
+		assertThat(past).hasStatus(400);
+		assertThat(JsonPath.<String>read(body(past), "$.detail")).isEqualTo("Choose a day from today on.");
+		assertThat(add(token, "{\"name\": \"Vacuum\", \"date\": \"%s\"}".formatted(today.plusYears(2).plusDays(1))))
+			.hasStatus(400);
+		assertThat(names(token)).isEmpty();
+		assertThat(week(token)).isEmpty();
+
+		assertThat(add(token, "{\"name\": \"Vacuum\", \"date\": \"%s\"}".formatted(today))).hasStatus(201);
+	}
+
+	@Test
 	void doneOnAnEarlierDayShowsOnThatDayAsDone() {
 		String token = registerWithHousehold("pat@example.com");
 		long id = id(add(token, "{\"name\": \"Hang shelves\"}"));

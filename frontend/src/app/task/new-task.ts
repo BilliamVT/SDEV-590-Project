@@ -3,7 +3,9 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { errorMessage } from '../auth/error-message';
+import { BacklogService } from '../backlog/backlog.service';
 import { HouseholdService } from '../household/household.service';
+import { dayLabel } from '../schedule/dates';
 import { focusFirstInvalid } from '../shared/focus';
 import { Toast } from '../shared/toast';
 import { CreateTaskRequest, DayOfWeek, Frequency } from './task.models';
@@ -13,6 +15,12 @@ import { TaskService } from './task.service';
 const DAYS: DayOfWeek[] = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
 /** Same limits as the backend's RecurrenceRules. */
+/**
+ * The Repeats menu: a schedule, or Never for a one-time task on a day (BILLIAMVT-59). A one-time
+ * task is a one-off item put straight on that day, not a task with a schedule.
+ */
+type Repeats = Frequency | 'ONCE';
+
 const INTERVAL_LIMITS: Partial<Record<Frequency, { max: number; unit: string }>> = {
   EVERY_N_DAYS: { max: 90, unit: 'days' },
   EVERY_N_WEEKS: { max: 52, unit: 'weeks' },
@@ -31,6 +39,7 @@ const INTERVAL_LIMITS: Partial<Record<Frequency, { max: number; unit: string }>>
 export class NewTask {
   private readonly host = inject(ElementRef<HTMLElement>).nativeElement;
   private readonly tasks = inject(TaskService);
+  private readonly backlog = inject(BacklogService);
   private readonly households = inject(HouseholdService);
   private readonly router = inject(Router);
   private readonly toast = inject(Toast);
@@ -39,13 +48,15 @@ export class NewTask {
   /** An edited task's current start date, which may already be in the past. */
   private readonly originalStart = signal<string | null>(null);
 
-  protected readonly frequencies: { value: Frequency; label: string }[] = [
+  protected readonly frequencies: { value: Repeats; label: string }[] = [
     { value: 'DAILY', label: 'Every day' },
     { value: 'WEEKLY', label: 'Every week' },
     { value: 'EVERY_N_DAYS', label: 'Every few days' },
     { value: 'EVERY_N_WEEKS', label: 'Every few weeks' },
     { value: 'MONTHLY', label: 'Every month' },
     { value: 'QUARTERLY', label: 'Every 3 months' },
+    // Only when adding: an existing task keeps a schedule (BILLIAMVT-59)
+    ...(this.taskId === null ? [{ value: 'ONCE' as Repeats, label: 'Never (one time)' }] : []),
   ];
   /** The day toggles: S M T W T F S, with each day's full name for screen readers */
   protected readonly days = DAYS.map((value) => ({ value, letter: value.charAt(0), name: value.charAt(0) + value.slice(1).toLowerCase() }));
@@ -53,7 +64,7 @@ export class NewTask {
 
   protected readonly form = inject(FormBuilder).group({
     name: ['', [Validators.required, Validators.maxLength(100)]],
-    frequency: ['WEEKLY' as Frequency, Validators.required],
+    frequency: ['WEEKLY' as Repeats, Validators.required],
     interval: [2 as number | null],
     // None chosen at first: a preselected day would be easy to keep by accident when tapping another
     daysOfWeek: [[] as DayOfWeek[]],
@@ -119,8 +130,19 @@ export class NewTask {
     return text.charAt(0).toLowerCase() + text.slice(1);
   }
 
-  protected frequency(): Frequency {
+  protected frequency(): Repeats {
     return this.form.controls.frequency.value ?? 'WEEKLY';
+  }
+
+  /** Never: a one-time task on the chosen day (BILLIAMVT-59). */
+  protected once(): boolean {
+    return this.frequency() === 'ONCE';
+  }
+
+  /** A one-time task's latest day: 2 years ahead, as for scheduling a backlog item. */
+  protected maxOnce(): string {
+    const [year, rest] = [this.today().slice(0, 4), this.today().slice(4)];
+    return `${Number(year) + 2}${rest}`;
   }
 
   protected needsDay(): boolean {
@@ -142,11 +164,12 @@ export class NewTask {
   }
 
   protected intervalLimit() {
-    return INTERVAL_LIMITS[this.frequency()];
+    return this.once() ? undefined : INTERVAL_LIMITS[this.frequency() as Frequency];
   }
 
+  /** A start date, or for a one-time task its day. */
   protected needsStartDate(): boolean {
-    return this.intervalLimit() !== undefined || this.frequency() === 'QUARTERLY';
+    return this.intervalLimit() !== undefined || this.frequency() === 'QUARTERLY' || this.once();
   }
 
   /**
@@ -157,7 +180,7 @@ export class NewTask {
   protected preview(): string | null {
     const value = this.form.getRawValue();
     // An edited task's unchanged start can be in the past; "first time" would be misleading then
-    if (!this.needsStartDate() || this.startInvalid() || this.intervalInvalid() || this.daysInvalid() || value.startsOn! < this.today()) {
+    if (this.once() || !this.needsStartDate() || this.startInvalid() || this.intervalInvalid() || this.daysInvalid() || value.startsOn! < this.today()) {
       return null;
     }
     const [year, month, day] = value.startsOn!.split('-').map(Number);
@@ -205,6 +228,10 @@ export class NewTask {
     }
     this.saving.set(true);
     this.error.set(null);
+    if (this.once()) {
+      this.saveOnce();
+      return;
+    }
     const save = this.taskId === null ? this.tasks.create(this.request()) : this.tasks.update(this.taskId, this.request());
     save.subscribe({
       // A new task goes back to the week view, an edited one to the task list. "Saved" is a toast that
@@ -224,10 +251,34 @@ export class NewTask {
     });
   }
 
+  /**
+   * A one-time task goes straight onto its day in one request (BILLIAMVT-59): a one-off item with a
+   * date, so it behaves like a backlog item put on a day.
+   */
+  private saveOnce(): void {
+    const value = this.form.getRawValue();
+    const date = value.startsOn!;
+    this.backlog
+      .create({ name: value.name!.trim(), date, ...(value.estimatedMinutes ? { estimatedMinutes: value.estimatedMinutes } : {}) })
+      .subscribe({
+        next: (item) => {
+          this.toast.show(`Saved: ${item.name}, ${dayLabel(date)}.`, {
+            label: 'Add another',
+            run: () => void this.router.navigate(['/tasks/new']),
+          });
+          void this.router.navigate(['/']);
+        },
+        error: (err: unknown) => {
+          this.error.set(errorMessage(err));
+          this.saving.set(false);
+        },
+      });
+  }
+
   /** Only the fields this frequency uses. */
   private request(): CreateTaskRequest {
     const value = this.form.getRawValue();
-    const request: CreateTaskRequest = { name: value.name!.trim(), frequency: this.frequency() };
+    const request: CreateTaskRequest = { name: value.name!.trim(), frequency: this.frequency() as Frequency };
     if (this.intervalLimit()) request.interval = value.interval!;
     if (this.needsDay()) request.daysOfWeek = value.daysOfWeek!;
     if (this.frequency() === 'MONTHLY') request.dayOfMonth = Number(value.dayOfMonth);

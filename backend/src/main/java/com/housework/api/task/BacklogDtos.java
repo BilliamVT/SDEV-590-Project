@@ -14,10 +14,15 @@ public final class BacklogDtos {
 	private BacklogDtos() {
 	}
 
-	/** A one-off item has no schedule fields: it waits in the backlog until it's put on a day. */
+	/**
+	 * A one-off item has no schedule fields: it waits in the backlog until it's put on a day. With a
+	 * date, it goes straight onto that day instead (BILLIAMVT-59), as if added and then scheduled.
+	 */
 	public record CreateItemRequest(@NotBlank @Size(max = 100) String name,
 			/** Optional; up to a full day */
-			@Min(1) @Max(1440) Integer estimatedMinutes) {
+			@Min(1) @Max(1440) Integer estimatedMinutes,
+			/** Optional; today (the household's) up to 2 years ahead */
+			LocalDate date) {
 	}
 
 	/** The day to schedule an item on, or the day it was done. */

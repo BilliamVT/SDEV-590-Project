@@ -11,6 +11,7 @@ import { toIsoDate } from '../schedule/dates';
 import { NewTask } from './new-task';
 import { TaskService } from './task.service';
 import { Toast } from '../shared/toast';
+import { BacklogService } from '../backlog/backlog.service';
 
 const savedTask = (request: CreateTaskRequest): Task => ({
   id: 1,
@@ -41,11 +42,19 @@ describe('NewTask', () => {
   async function render(
     create: (request: CreateTaskRequest) => Observable<Task> = (r) => of(savedTask(r)),
     households: object = knownHousehold(),
+    createItem: (request: { name: string; date?: string; estimatedMinutes?: number }) => Observable<unknown> = (r) =>
+      of({ id: 9, name: r.name, estimatedMinutes: r.estimatedMinutes ?? null }),
   ) {
     const tasks = { create: vi.fn(create) };
+    const backlog = { create: vi.fn(createItem) };
     await TestBed.configureTestingModule({
       imports: [NewTask],
-      providers: [provideRouter([]), { provide: TaskService, useValue: tasks }, { provide: HouseholdService, useValue: households }],
+      providers: [
+        provideRouter([]),
+        { provide: TaskService, useValue: tasks },
+        { provide: BacklogService, useValue: backlog },
+        { provide: HouseholdService, useValue: households },
+      ],
     }).compileComponents();
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -71,7 +80,7 @@ describe('NewTask', () => {
       element.querySelector<HTMLButtonElement>(`#task-day button[aria-label="${day}"]`)!.click();
       await fixture.whenStable();
     };
-    return { tasks, router, fixture, element, set, submit, click, toggle };
+    return { tasks, backlog, router, fixture, element, set, submit, click, toggle };
   }
 
   it('creates a weekly task with only the fields it needs, then shows the week', async () => {
@@ -90,6 +99,53 @@ describe('NewTask', () => {
     expect(toast.action()?.label).toBe('Add another');
     toast.act();
     expect(router.navigate).toHaveBeenLastCalledWith(['/tasks/new']);
+  });
+
+  describe('Never: a one-time task on a day (BILLIAMVT-59)', () => {
+    it('asks for the day, from today up to 2 years ahead, with no repeat fields', async () => {
+      const { element, set } = await render();
+      await set('task-frequency', 'ONCE');
+
+      const day = element.querySelector<HTMLInputElement>('#task-start')!;
+      expect(element.querySelector('label[for="task-start"]')?.textContent).toBe('On');
+      expect(day.value).toBe('2026-11-04');
+      expect(day.min).toBe('2026-11-04');
+      expect(day.max).toBe('2028-11-04');
+      expect(['task-interval', 'task-day', 'task-day-of-month'].filter((id) => element.querySelector(`#${id}`))).toEqual([]);
+      expect(element.querySelector('.preview')).toBeNull();
+    });
+
+    it('puts it straight on that day in one request, and confirms with the day', async () => {
+      const { tasks, backlog, router, set, submit } = await render();
+      await set('task-name', ' Vacuum ');
+      await set('task-frequency', 'ONCE');
+      await set('task-start', '2026-11-08');
+      await set('task-minutes', '20');
+      await submit();
+
+      expect(backlog.create).toHaveBeenCalledWith({ name: 'Vacuum', date: '2026-11-08', estimatedMinutes: 20 });
+      expect(tasks.create).not.toHaveBeenCalled();
+      expect(router.navigate).toHaveBeenCalledWith(['/']);
+      const toast = TestBed.inject(Toast);
+      expect(toast.message()).toBe('Saved: Vacuum, Sunday, Nov 8.');
+      expect(toast.action()?.label).toBe('Add another');
+    });
+
+    it("needs a day from today on, and shows the server's reason if it's refused", async () => {
+      const { backlog, element, set, submit } = await render(undefined, undefined, () =>
+        throwError(() => new HttpErrorResponse({ status: 400, error: { detail: 'Choose a day within 2 years of today.' } })),
+      );
+      await set('task-name', 'Vacuum');
+      await set('task-frequency', 'ONCE');
+      await set('task-start', '2026-11-03');
+      await submit();
+      expect(element.querySelector('#task-start-error')?.textContent).toBe('Choose a day from today on.');
+      expect(backlog.create).not.toHaveBeenCalled();
+
+      await set('task-start', '2026-11-05');
+      await submit();
+      expect(element.querySelector('.form-error')?.textContent).toBe('Choose a day within 2 years of today.');
+    });
   });
 
   it('shows only the fields each frequency uses', async () => {

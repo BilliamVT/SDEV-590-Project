@@ -223,3 +223,18 @@ test('a backlog item can be deleted from the backlog, or for good from the week'
   await expect(backlog(page).getByText('Nothing in the backlog.')).toBeVisible();
   await expect(today(page).getByText('Paint fence')).toHaveCount(0);
 });
+
+test('a one-time task can be added straight to a day, without the backlog (BILLIAMVT-59)', async ({ page }) => {
+  await signUpWithHousehold(page, 'Pat');
+
+  // The day defaults to today, which is always in the shown week
+  await addTask(page, 'Vacuum', 'Never (one time)');
+
+  await expect(page.locator('.toast')).toContainText(/Saved: Vacuum, \w+, \w{3} \d{1,2}\./);
+  await expect(today(page).getByText('Vacuum')).toBeVisible();
+  await expect(backlog(page).getByText('Nothing in the backlog.')).toBeVisible();
+
+  // It behaves like any day: it can be marked done
+  await today(page).getByRole('button', { name: 'Mark Vacuum done' }).click();
+  await expect(today(page).getByText('Done by Pat')).toBeVisible();
+});
