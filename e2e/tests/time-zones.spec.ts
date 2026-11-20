@@ -52,6 +52,6 @@ test('a member behind the household adds a task starting on the default day', as
   await sam.getByLabel('Every how many days?').fill('3');
   await sam.getByRole('button', { name: 'Save task' }).click();
 
-  await expect(sam.getByRole('status')).toContainText('Saved: Water plants,');
+  await expect(sam.locator('.toast')).toContainText('Saved: Water plants,');
   await sam.context().close();
 });

@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { errorMessage } from '../auth/error-message';
 import { HouseholdService } from '../household/household.service';
 import { focusFirstInvalid } from '../shared/focus';
+import { Toast } from '../shared/toast';
 import { CreateTaskRequest, DayOfWeek, Frequency } from './task.models';
 import { TaskService } from './task.service';
 
@@ -32,6 +33,7 @@ export class NewTask {
   private readonly tasks = inject(TaskService);
   private readonly households = inject(HouseholdService);
   private readonly router = inject(Router);
+  private readonly toast = inject(Toast);
   /** Set when editing an existing task. */
   protected readonly taskId = Number(inject(ActivatedRoute).snapshot.paramMap.get('id')) || null;
   /** An edited task's current start date, which may already be in the past. */
@@ -205,11 +207,16 @@ export class NewTask {
     this.error.set(null);
     const save = this.taskId === null ? this.tasks.create(this.request()) : this.tasks.update(this.taskId, this.request());
     save.subscribe({
-      // A new task goes back to the week view, an edited one to the task list; both show a "Saved" notice
-      next: (task) =>
-        void this.router.navigate([this.taskId === null ? '/' : '/tasks'], {
-          state: { savedTask: { name: task.name, schedule: this.lowerFirst(task.schedule) } },
-        }),
+      // A new task goes back to the week view, an edited one to the task list. "Saved" is a toast that
+      // goes away on its own (BILLIAMVT-57); after adding, it offers to add another.
+      next: (task) => {
+        const added = this.taskId === null;
+        this.toast.show(
+          `Saved: ${task.name}, ${this.lowerFirst(task.schedule)}.`,
+          added ? { label: 'Add another', run: () => void this.router.navigate(['/tasks/new']) } : undefined,
+        );
+        void this.router.navigate([added ? '/' : '/tasks']);
+      },
       error: (err: unknown) => {
         this.error.set(errorMessage(err));
         this.saving.set(false);

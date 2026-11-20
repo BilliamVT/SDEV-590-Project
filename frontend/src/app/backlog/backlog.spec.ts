@@ -7,6 +7,7 @@ import { toIsoDate } from '../schedule/dates';
 import { Backlog } from './backlog';
 import { BacklogItem, CreateItemRequest } from './backlog.models';
 import { BacklogService } from './backlog.service';
+import { Toast } from '../shared/toast';
 
 const shelves: BacklogItem = { id: 1, name: 'Hang shelves', estimatedMinutes: 45 };
 const gutters: BacklogItem = { id: 2, name: 'Clean gutters', estimatedMinutes: null };
@@ -137,7 +138,9 @@ describe('Backlog (BILLIAMVT-23)', () => {
 
     expect(backlog.done).toHaveBeenCalledWith(1, '2026-11-11');
     expect(names()).toEqual(['Clean gutters']);
-    expect(element.querySelector('.notice')?.textContent).toBe('Marked "Hang shelves" done on Wednesday, Nov 11.');
+    // A toast, not a notice in the page (BILLIAMVT-57)
+    expect(TestBed.inject(Toast).message()).toBe('Marked "Hang shelves" done on Wednesday, Nov 11.');
+    expect(element.querySelector('.notice')).toBeNull();
     expect(placed).toHaveBeenCalledTimes(1);
   });
 
@@ -180,7 +183,8 @@ describe('Backlog (BILLIAMVT-23)', () => {
 
     expect(backlog.schedule).toHaveBeenCalledWith(2, '2026-11-13');
     expect(names()).toEqual(['Hang shelves']);
-    expect(element.querySelector('.notice')?.textContent).toBe('"Clean gutters" is on Friday, Nov 13.');
+    expect(TestBed.inject(Toast).message()).toBe('"Clean gutters" is on Friday, Nov 13.');
+    expect(element.querySelector('.notice')).toBeNull();
     expect(placed).toHaveBeenCalledTimes(1);
   });
 
@@ -226,7 +230,11 @@ describe('Backlog (BILLIAMVT-23)', () => {
 
   it('reloads when asked, so a skipped day comes back, and clears the last notice', async () => {
     let items = [shelves, gutters];
-    const { fixture, element, names, click } = await render({ list: () => of(items) });
+    // A notice now only explains something that changed elsewhere (BILLIAMVT-57): here, a 404
+    const { fixture, element, names, click } = await render({
+      list: () => of(items),
+      done: () => throwError(() => new HttpErrorResponse({ status: 404 })),
+    });
     await click('More for Hang shelves');
     await click('Mark done: Hang shelves');
     await click('Mark done');
@@ -241,10 +249,11 @@ describe('Backlog (BILLIAMVT-23)', () => {
   });
 
   it('clears the last notice when choosing another day', async () => {
-    const { element, click } = await render();
+    const { element, click } = await render({ done: () => throwError(() => new HttpErrorResponse({ status: 404 })) });
     await click('More for Hang shelves');
     await click('Mark done: Hang shelves');
     await click('Mark done');
+    expect(element.querySelector('.notice')).not.toBeNull();
     await click('Schedule Clean gutters');
 
     expect(element.querySelector('.notice')).toBeNull();

@@ -7,6 +7,7 @@ import { HouseholdService } from '../household/household.service';
 import { toIsoDate } from '../schedule/dates';
 import { NewTask } from './new-task';
 import { TaskService } from './task.service';
+import { Toast } from '../shared/toast';
 
 /** The task form in edit mode, at /tasks/:id/edit (BILLIAMVT-22). */
 describe('NewTask (editing)', () => {
@@ -92,9 +93,10 @@ describe('NewTask (editing)', () => {
       startsOn: '2026-11-02',
       estimatedMinutes: 5,
     });
-    expect(router.navigate).toHaveBeenCalledWith(['/tasks'], {
-      state: { savedTask: { name: 'Water plants', schedule: 'every 4 days' } },
-    });
+    expect(router.navigate).toHaveBeenCalledWith(['/tasks']);
+    // A toast, with no "Add another" after an edit (BILLIAMVT-57)
+    expect(TestBed.inject(Toast).message()).toBe('Saved: Water plants, every 4 days.');
+    expect(TestBed.inject(Toast).action()).toBeNull();
   });
 
   it("doesn't allow moving the start to another past date", async () => {

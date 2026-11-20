@@ -67,7 +67,7 @@ export async function addTask(page: Page, name: string, repeats: string, days: s
     await page.getByRole('button', { name: day, exact: true }).click();
   }
   await page.getByRole('button', { name: 'Save task' }).click();
-  await expect(page.getByRole('status')).toContainText(`Saved: ${name},`);
+  await expect(page.locator('.toast')).toContainText(`Saved: ${name},`);
 }
 
 /** Today in the week view. */

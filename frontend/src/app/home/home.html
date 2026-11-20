@@ -1,12 +1,5 @@
 <p class="welcome">Welcome, {{ auth.user()?.displayName }}.</p>
 
-@if (savedTask; as task) {
-  <p class="notice" role="status">
-    Saved: <strong>{{ task.name }}</strong>, {{ task.schedule }}.
-    <a routerLink="/tasks/new">Add another</a>
-  </p>
-}
-
 <p class="actions home-actions">
   <a class="button primary" routerLink="/tasks/new">Add a task</a>
   <a class="button" routerLink="/tasks">Your tasks</a>

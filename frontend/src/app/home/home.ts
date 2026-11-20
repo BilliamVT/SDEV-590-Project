@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
 import { Backlog } from '../backlog/backlog';
@@ -18,9 +18,4 @@ import { WeekView } from '../schedule/week-view';
 })
 export class Home {
   protected readonly auth = inject(AuthService);
-
-  /** Set when arriving from the New task form (BILLIAMVT-39). */
-  protected readonly savedTask = inject(Router).currentNavigation()?.extras.state?.['savedTask'] as
-    | { name: string; schedule: string }
-    | undefined;
 }

@@ -36,7 +36,7 @@ test('editing, pausing, resuming and deleting a task changes the week', async ({
   await expect(taskName).toHaveValue('Dishes');
   await taskName.fill('Wash dishes');
   await page.getByRole('button', { name: 'Save task' }).click();
-  await expect(page.getByRole('status')).toContainText('Saved: Wash dishes, every day.');
+  await expect(page.locator('.toast')).toContainText('Saved: Wash dishes, every day.');
   await week();
   await expect(today(page).getByText('Wash dishes')).toBeVisible();
 
@@ -61,4 +61,18 @@ test('editing, pausing, resuming and deleting a task changes the week', async ({
   await expect(page.getByText('No tasks yet. Add your first one.')).toBeVisible();
   await week();
   await expect(today(page).getByText('Nothing scheduled')).toBeVisible();
+});
+
+test('saving a new task confirms it in a toast that offers to add another (BILLIAMVT-57)', async ({ page }) => {
+  await signUpWithHousehold(page, 'Pat');
+  await addTask(page, 'Vacuum', 'Every day');
+
+  const toast = page.locator('.toast');
+  await expect(toast).toContainText('Saved: Vacuum, every day.');
+  // Nothing stays at the top of the week
+  await expect(page.locator('.notice').filter({ hasText: 'Saved' })).toHaveCount(0);
+
+  await toast.getByRole('button', { name: /^Add another/ }).click();
+  await expect(page).toHaveURL(/\/tasks\/new$/);
+  await expect(toast).toBeHidden();
 });

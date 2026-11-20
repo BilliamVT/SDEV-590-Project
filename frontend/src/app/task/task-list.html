@@ -1,9 +1,5 @@
 <h2 tabindex="-1">Your tasks</h2>
 
-@if (savedTask; as saved) {
-  <p class="notice" role="status">Saved: <strong>{{ saved.name }}</strong>, {{ saved.schedule }}.</p>
-}
-
 <p class="actions">
   <a class="button primary" routerLink="/tasks/new">Add a task</a>
   <a class="button" routerLink="/">Back to the week</a>

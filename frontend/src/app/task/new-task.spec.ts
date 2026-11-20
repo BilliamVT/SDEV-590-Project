@@ -10,6 +10,7 @@ import { HouseholdService } from '../household/household.service';
 import { toIsoDate } from '../schedule/dates';
 import { NewTask } from './new-task';
 import { TaskService } from './task.service';
+import { Toast } from '../shared/toast';
 
 const savedTask = (request: CreateTaskRequest): Task => ({
   id: 1,
@@ -82,9 +83,13 @@ describe('NewTask', () => {
     await submit();
 
     expect(tasks.create).toHaveBeenCalledWith({ name: 'Vacuum', frequency: 'WEEKLY', daysOfWeek: ['SATURDAY'], estimatedMinutes: 30 });
-    expect(router.navigate).toHaveBeenCalledWith(['/'], {
-      state: { savedTask: { name: 'Vacuum', schedule: 'every week on Saturday' } },
-    });
+    expect(router.navigate).toHaveBeenCalledWith(['/']);
+    // A toast that goes away on its own, offering to add another (BILLIAMVT-57)
+    const toast = TestBed.inject(Toast);
+    expect(toast.message()).toBe('Saved: Vacuum, every week on Saturday.');
+    expect(toast.action()?.label).toBe('Add another');
+    toast.act();
+    expect(router.navigate).toHaveBeenLastCalledWith(['/tasks/new']);
   });
 
   it('shows only the fields each frequency uses', async () => {

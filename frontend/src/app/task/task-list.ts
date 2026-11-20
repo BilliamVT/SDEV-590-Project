@@ -29,10 +29,6 @@ export class TaskList {
   protected readonly confirmingId = signal<number | null>(null);
   /** The task the delete action sheet is open for (BILLIAMVT-49) */
   protected readonly pendingDelete = computed(() => this.list()?.find((t) => t.id === this.confirmingId()) ?? null);
-  /** Set when arriving from the edit form. */
-  protected readonly savedTask = inject(Router).currentNavigation()?.extras.state?.['savedTask'] as
-    | { name: string; schedule: string }
-    | undefined;
 
   constructor() {
     this.load();

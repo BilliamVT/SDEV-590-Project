@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { Router, provideRouter } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { NEVER } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
@@ -17,7 +17,7 @@ describe('Home', () => {
 
   let lastFixture: ComponentFixture<Home>;
 
-  async function render(savedTask?: { name: string; schedule: string }): Promise<HTMLElement> {
+  async function render(): Promise<HTMLElement> {
     await TestBed.configureTestingModule({
       imports: [Home],
       providers: [
@@ -28,23 +28,13 @@ describe('Home', () => {
         { provide: AuthService, useValue: { user: signal({ id: 2, email: 'bill@example.com', displayName: 'Bill' }) } },
       ],
     }).compileComponents();
-    if (savedTask) {
-      vi.spyOn(TestBed.inject(Router), 'currentNavigation').mockReturnValue({ extras: { state: { savedTask } } } as never);
-    }
     const fixture = TestBed.createComponent(Home);
     await fixture.whenStable();
     lastFixture = fixture;
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('confirms a task that was just saved, with a link to add another', async () => {
-    const element = await render({ name: 'Vacuum', schedule: 'every week on Saturday' });
-    const notice = element.querySelector('.notice');
-    expect(notice?.textContent).toContain('Saved: Vacuum, every week on Saturday.');
-    expect(notice?.querySelector('a[href="/tasks/new"]')?.textContent).toBe('Add another');
-  });
-
-  it('shows no notice on a normal visit', async () => {
+  it('shows no notice on a normal visit; "Saved" is a toast from the form (BILLIAMVT-57)', async () => {
     const element = await render();
     expect(element.querySelector('.notice')).toBeNull();
   });
