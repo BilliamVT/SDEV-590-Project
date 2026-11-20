@@ -190,6 +190,22 @@ describe('WeekView', () => {
     expect(element.textContent).toContain("couldn't be reached");
   });
 
+  it('offers Try again when the week failed to load, and only then (BILLIAMVT-53)', async () => {
+    let calls = 0;
+    const { element, fixture } = await render((from, to) =>
+      ++calls === 1 ? throwError(() => new HttpErrorResponse({ status: 0 })) : of(schedule(from, to, [])),
+    );
+    const retry = () => element.querySelector<HTMLButtonElement>('button.retry');
+
+    retry()!.click();
+    await fixture.whenStable();
+
+    expect(calls).toBe(2);
+    expect(element.textContent).not.toContain("couldn't be reached");
+    expect(element.querySelectorAll('.day')).toHaveLength(7);
+    expect(retry()).toBeNull();
+  });
+
   describe('marking done or skipped', () => {
     const vacuum = occurrence(1, 'Vacuum', '2026-11-11');
     const withVacuum = (from: string, to: string) => of(schedule(from, to, [vacuum]));

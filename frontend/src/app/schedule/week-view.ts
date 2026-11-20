@@ -579,6 +579,11 @@ export class WeekView {
     });
   }
 
+  /** Loading the week failed: try again (BILLIAMVT-53). */
+  protected retry(): void {
+    this.load();
+  }
+
   /** Coming back to the app reloads the week silently: a change appearing isn't an error. */
   protected refreshIfVisible(): void {
     if (document.visibilityState === 'visible' && !this.noHousehold()) {

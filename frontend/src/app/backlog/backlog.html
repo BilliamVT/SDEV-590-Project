@@ -48,6 +48,10 @@
 
     @if (error()) {
       <p class="form-error" role="alert">{{ error() }}</p>
+      @if (!noHousehold()) {
+        <!-- Try again: the home-screen app has no reload button (BILLIAMVT-53) -->
+        <button type="button" class="retry" (click)="retry()">Try again</button>
+      }
     } @else if (items(); as items) {
       @if (items.length === 0) {
         <p class="empty">Nothing in the backlog.</p>

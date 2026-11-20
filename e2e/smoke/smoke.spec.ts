@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { expectInstallable } from '../shared/home-screen';
+
 /**
  * After each deploy: production works in a real browser, not just its health check (BILLIAMVT-48).
  * Read-only. The smoke household has no tasks, so viewing its week generates nothing.
@@ -48,4 +50,12 @@ test('a member can log in, see their week and household, and log out', async ({ 
 
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
+});
+
+test('the deployed app can be added to a home screen: manifest and icons at the right paths (BILLIAMVT-53)', async ({
+  page,
+  request,
+}) => {
+  await page.goto('./');
+  await expectInstallable(page, request);
 });

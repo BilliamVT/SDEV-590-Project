@@ -34,7 +34,8 @@
 // Phones: slide up from the bottom, buttons stacked full width, Cancel last, as in iOS
 @media (max-width: 599px) {
   .sheet {
-    margin: auto auto var(--space-3);
+    // Above the iPhone home indicator when full screen (BILLIAMVT-53)
+    margin: auto auto calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
     animation: slide-up 0.2s ease-out;
   }
 

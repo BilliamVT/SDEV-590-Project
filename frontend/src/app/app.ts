@@ -3,6 +3,7 @@ import { Router, RouterLink, RouterOutlet } from '@angular/router';
 
 import { AuthService } from './auth/auth.service';
 import { Announcer } from './shared/announcer';
+import { AppUpdate } from './shared/app-update';
 import { Toast } from './shared/toast';
 
 @Component({
@@ -16,6 +17,11 @@ export class App {
   protected readonly auth = inject(AuthService);
   protected readonly announcer = inject(Announcer);
   protected readonly toast = inject(Toast);
+
+  constructor() {
+    // A home-screen app left open picks up a new deploy when it comes back into view (BILLIAMVT-53)
+    inject(AppUpdate).start();
+  }
 
   protected logout(): void {
     this.auth.logout();

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Housework Scheduler app icon (BILLIAMVT-53): a house with a tick, in the app's teal.
+       Everything sits inside the maskable safe zone (a circle 80% of the width), so the same art
+       works for every icon size and shape. -->
+  <rect width="512" height="512" fill="#0f766e"/>
+  <g fill="none" stroke="#ffffff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M104 252 L256 124 L408 252"/>
+    <path d="M144 226 V384 a16 16 0 0 0 16 16 H352 a16 16 0 0 0 16 -16 V226"/>
+    <path d="M200 312 L242 354 L316 276"/>
+  </g>
+</svg>

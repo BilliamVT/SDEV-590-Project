@@ -83,6 +83,10 @@ body {
   line-height: 1.4;
   color: var(--color-text);
   background: var(--color-background);
+  // Full screen from the home screen (BILLIAMVT-53, viewport-fit=cover): keep content clear of the
+  // notch or Dynamic Island, the rounded corners in landscape, and the home indicator. 0 elsewhere.
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
 }
 
 h1,
@@ -225,6 +229,11 @@ label {
 
 .warning {
   font-weight: 600;
+}
+
+// Try again under a load error (BILLIAMVT-53)
+.retry {
+  margin: var(--space-2) 0 var(--space-4);
 }
 
 .notice {
