@@ -21,9 +21,26 @@
     } @else if (loading() && !schedule()) {
       <p class="hint">Loading your week… The server sleeps when it isn't in use, so this can take up to a minute.</p>
     } @else {
-      <ol class="days" [class.refreshing]="loading()">
+      <!-- Each day is a drop target for drag-and-drop (BILLIAMVT-28), including empty days -->
+      <ol class="days" [class.refreshing]="loading()" [class.dragging]="dragging()" [class.drag-enabled]="dragEnabled()" cdkDropListGroup>
         @for (day of days(); track day.date) {
-          <li class="day" [attr.data-date]="day.date" [class.today]="day.isToday" [class.empty-day]="day.occurrences.length === 0">
+          <li
+            class="day"
+            [attr.data-date]="day.date"
+            [class.today]="day.isToday"
+            [class.empty-day]="day.occurrences.length === 0"
+            [class.past]="day.date < (schedule()?.today ?? '')"
+            [class.drop-target]="dragging() && day.date !== dragFrom()"
+            [class.drop-over]="dropOver() === day.date"
+            [style.min-height.px]="day.date === dragFrom() ? dragFromHeight() : null"
+            cdkDropList
+            [cdkDropListData]="day.date"
+            [cdkDropListDisabled]="!dragEnabled()"
+            [cdkDropListSortingDisabled]="true"
+            [cdkDropListEnterPredicate]="acceptsDrop"
+            [cdkDropListAutoScrollStep]="autoScrollStep"
+            (cdkDropListDropped)="dropped($event)"
+          >
             <!-- Focusable from code only: where focus goes when a row is deleted -->
             <h3 tabindex="-1">
               {{ day.label }}
@@ -38,6 +55,14 @@
                 @for (occurrence of day.occurrences; track occurrence.id) {
                   <li
                     class="occurrence"
+                    cdkDrag
+                    [cdkDragData]="occurrence"
+                    [cdkDragDisabled]="!canDrag(occurrence)"
+                    [cdkDragStartDelay]="dragStartDelay"
+                    [class.draggable]="canDrag(occurrence)"
+                    (cdkDragStarted)="dragStarted($event)"
+                    (cdkDragMoved)="dragMoved($event)"
+                    (cdkDragEnded)="dragEnded()"
                     [class.overdue]="occurrence.overdue"
                     [class.deleted]="occurrence.taskDeleted"
                     [attr.data-status]="occurrence.status"

@@ -297,3 +297,22 @@ label {
     }
   }
 }
+
+// A week-view row being dragged (BILLIAMVT-28). The CDK moves a copy to the end of the page, so
+// it's styled here rather than in the week view. Lifted like a card, as iPhone lists do: a solid
+// background, a teal outline (the focus colour, which is the brighter teal in dark mode), a strong
+// shadow and a slight scale-up.
+.cdk-drag-preview.occurrence {
+  box-sizing: border-box;
+  padding: 0 var(--space-2);
+  list-style: none;
+  border: 2px solid var(--color-focus);
+  border-radius: var(--radius);
+  background: var(--color-background);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.3);
+  cursor: grabbing;
+
+  @media (prefers-reduced-motion: no-preference) {
+    scale: 1.03;
+  }
+}

@@ -5,7 +5,9 @@ import { NEVER, Observable, of, throwError } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
 import { BacklogService } from '../backlog/backlog.service';
+import { FeatureFlagsService } from '../feature/feature-flags.service';
 import { Announcer } from '../shared/announcer';
+import { Toast } from '../shared/toast';
 import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
 import { ScheduleService } from './schedule.service';
 import { WeekView } from './week-view';
@@ -50,6 +52,10 @@ describe('WeekView', () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  /** The drag-drop flag (BILLIAMVT-28); off unless a test turns it on */
+  const dragDrop = signal(false);
+  beforeEach(() => dragDrop.set(false));
+
   async function render(
     between: (from: string, to: string) => Observable<Schedule> = (from, to) => of(schedule(from, to)),
     changeStatus: (id: number, status: OccurrenceStatus) => Observable<ScheduledOccurrence> = () => NEVER,
@@ -70,6 +76,7 @@ describe('WeekView', () => {
         { provide: ScheduleService, useValue: schedules },
         { provide: BacklogService, useValue: backlog },
         { provide: AuthService, useValue: { user: signal({ id: ME, email: 'pat@example.com', displayName: 'Pat' }) } },
+        { provide: FeatureFlagsService, useValue: { dragDrop } },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(WeekView);
@@ -678,7 +685,7 @@ describe('WeekView', () => {
       expect(sheetOpen(element)).toBe(false);
       expect(element.querySelectorAll('.day')[3].querySelector('.occurrence')).toBeNull();
       expect(element.querySelectorAll('.day')[5].querySelector('.occurrence')?.textContent).toContain('Vacuum');
-      expect(notice(element)).toBe('Vacuum moved to Friday, Nov 13.');
+      expect(TestBed.inject(Toast).message()).toBe('Vacuum moved to Friday, Nov 13.');
     });
 
     it('takes the row off this week when it moves to another week', async () => {
@@ -692,7 +699,24 @@ describe('WeekView', () => {
       await fixture.whenStable();
 
       expect(element.querySelector('.occurrence')).toBeNull();
-      expect(notice(element)).toBe('Vacuum moved to Friday, Nov 20.');
+      expect(TestBed.inject(Toast).message()).toBe('Vacuum moved to Friday, Nov 20.');
+    });
+
+    it('Undo puts a row moved to another week back on its day', async () => {
+      const { schedules, element, click, fixture } = await render(withVacuum, undefined, undefined, undefined, (id, date) =>
+        of({ ...vacuum, date }),
+      );
+      await openMove(click);
+      await pick(element, fixture, '2026-11-20');
+      inSheet(element, 'Move').click();
+      await fixture.whenStable();
+
+      TestBed.inject(Toast).act();
+      await fixture.whenStable();
+
+      expect(schedules.move).toHaveBeenLastCalledWith(1, '2026-11-11');
+      expect(element.querySelectorAll('.day')[3].querySelector('.occurrence')?.textContent).toContain('Vacuum');
+      expect(TestBed.inject(Toast).message()).toBe('Vacuum moved back to Wednesday, Nov 11.');
     });
 
     it("shows the server's message in the sheet, which stays open", async () => {
@@ -750,6 +774,215 @@ describe('WeekView', () => {
       expect(schedules.move).not.toHaveBeenCalled();
       expect(sheetOpen(element)).toBe(false);
       expect(document.activeElement?.getAttribute('aria-label')).toBe('More for Vacuum on Wednesday, Nov 11');
+    });
+  });
+
+  describe('dragging a day to another day (BILLIAMVT-28)', () => {
+    const vacuum = occurrence(1, 'Vacuum', '2026-11-11');
+    const done = occurrence(2, 'Dishes', '2026-11-11', { status: 'DONE', completedById: ME, completedByName: 'Pat' });
+    const gone = occurrence(3, 'Old chore', '2026-11-11', { taskDeleted: true });
+    const withRows = (from: string, to: string) => of(schedule(from, to, [vacuum, done, gone]));
+    const notice = (element: HTMLElement) => element.querySelector('.notice[role="status"]')?.textContent?.trim();
+    const rowsOn = (element: HTMLElement, index: number) =>
+      [...element.querySelectorAll('.day')[index].querySelectorAll('.occurrence .name')].map((n) => n.textContent);
+    /** What the CDK passes on a drop, from Wednesday Nov 11 to {@code date}; over the day unless said */
+    const drop = (component: unknown, item: ScheduledOccurrence, date: string, isPointerOverContainer = true) =>
+      (component as { dropped(e: unknown): void }).dropped({
+        item: { data: item },
+        container: { data: date },
+        previousContainer: { data: item.date },
+        isPointerOverContainer,
+      });
+
+    it('is off while the flag is off: no row can be dragged', async () => {
+      const { element } = await render(withRows);
+      expect(element.querySelectorAll('.occurrence.draggable')).toHaveLength(0);
+    });
+
+    it("with the flag on, only pending days of tasks that still exist can be dragged", async () => {
+      dragDrop.set(true);
+      const { element } = await render(withRows);
+      const draggable = [...element.querySelectorAll('.occurrence.draggable .name')].map((n) => n.textContent);
+      expect(draggable).toEqual(['Vacuum']);
+    });
+
+    it('only accepts drops on today or later', async () => {
+      dragDrop.set(true);
+      const { fixture } = await render(withRows);
+      const accepts = (fixture.componentInstance as unknown as {
+        acceptsDrop: (drag: unknown, list: { data: string }) => boolean;
+      }).acceptsDrop;
+      expect(accepts(null, { data: '2026-11-10' })).toBe(false);
+      expect(accepts(null, { data: '2026-11-11' })).toBe(true);
+      expect(accepts(null, { data: '2026-11-14' })).toBe(true);
+    });
+
+    it('moves the row at once, saves it with the move API, and says so', async () => {
+      dragDrop.set(true);
+      const { schedules, element, fixture } = await render(withRows, undefined, undefined, undefined, (id, date) =>
+        of({ ...vacuum, date }),
+      );
+
+      drop(fixture.componentInstance, vacuum, '2026-11-13');
+      await fixture.whenStable();
+
+      expect(schedules.move).toHaveBeenCalledWith(1, '2026-11-13');
+      expect(rowsOn(element, 3)).not.toContain('Vacuum');
+      expect(rowsOn(element, 5)).toEqual(['Vacuum']);
+      expect(TestBed.inject(Toast).message()).toBe('Vacuum moved to Friday, Nov 13.');
+    });
+
+    it('offers Undo, which moves the row back to its day and place', async () => {
+      dragDrop.set(true);
+      const { schedules, element, fixture } = await render(withRows, undefined, undefined, undefined, (id, date) =>
+        of({ ...vacuum, date }),
+      );
+      drop(fixture.componentInstance, vacuum, '2026-11-13');
+      await fixture.whenStable();
+      const toast = TestBed.inject(Toast);
+      expect(toast.action()?.label).toBe('Undo');
+
+      toast.act();
+      await fixture.whenStable();
+
+      expect(schedules.move).toHaveBeenLastCalledWith(1, '2026-11-11');
+      expect(rowsOn(element, 3)).toEqual(['Vacuum', 'Dishes', 'Old chore']);
+      expect(rowsOn(element, 5)).toEqual([]);
+      expect(toast.message()).toBe('Vacuum moved back to Wednesday, Nov 11.');
+      expect(toast.action()).toBeNull();
+    });
+
+    it('offers no Undo for an overdue day moved forward: it can\'t go back to the past', async () => {
+      dragDrop.set(true);
+      const mop = occurrence(4, 'Mop', '2026-11-10', { overdue: true });
+      const { fixture } = await render(
+        (from, to) => of(schedule(from, to, [mop])),
+        undefined,
+        undefined,
+        undefined,
+        (id, date) => of({ ...mop, date, overdue: false }),
+      );
+
+      drop(fixture.componentInstance, mop, '2026-11-12');
+      await fixture.whenStable();
+
+      expect(TestBed.inject(Toast).message()).toBe('Mop moved to Thursday, Nov 12.');
+      expect(TestBed.inject(Toast).action()).toBeNull();
+    });
+
+    it("stops the page scrolling only while a row is dragged (iPhone Safari)", async () => {
+      dragDrop.set(true);
+      const { fixture } = await render(withRows);
+      const touchMove = () => {
+        const event = new Event('touchmove', { cancelable: true });
+        document.dispatchEvent(event);
+        return event.defaultPrevented;
+      };
+      const component = fixture.componentInstance as unknown as { dragFrom: { set(date: string | null): void } };
+
+      expect(touchMove()).toBe(false);
+      component.dragFrom.set('2026-11-11');
+      expect(touchMove()).toBe(true);
+      component.dragFrom.set(null);
+      expect(touchMove()).toBe(false);
+    });
+
+    it('also stops it once a hold on a draggable row is complete, before the drag starts (iPhone Safari)', async () => {
+      dragDrop.set(true);
+      const { element } = await render(withRows);
+      vi.useFakeTimers();
+      try {
+        const touch = (type: string, target: EventTarget) => {
+          const event = new Event(type, { bubbles: true, cancelable: true });
+          // A full touch point: the CDK's own listener on the row reads it too
+          const point = { clientX: 10, clientY: 10, pageX: 10, pageY: 10, screenX: 10, screenY: 10, identifier: 0, target };
+          const down = type === 'touchstart' || type === 'touchmove' ? [point] : [];
+          Object.defineProperty(event, 'touches', { value: down });
+          Object.defineProperty(event, 'targetTouches', { value: down });
+          Object.defineProperty(event, 'changedTouches', { value: [point] });
+          target.dispatchEvent(event);
+          return event.defaultPrevented;
+        };
+        const row = element.querySelector('.occurrence.draggable .name')!;
+        const other = element.querySelector('.occurrence:not(.draggable)')!;
+
+        // A swipe that moves before the hold is up scrolls, and stays a scroll
+        touch('touchstart', row);
+        expect(touch('touchmove', row)).toBe(false);
+        vi.advanceTimersByTime(200);
+        expect(touch('touchmove', row)).toBe(false);
+        touch('touchend', row);
+
+        // Held still for the hold time: the first small move no longer scrolls
+        touch('touchstart', row);
+        vi.advanceTimersByTime(200);
+        expect(touch('touchmove', row)).toBe(true);
+        touch('touchend', row);
+        expect(touch('touchmove', row)).toBe(false);
+
+        // Rows that can't be dragged never stop scrolling
+        touch('touchstart', other);
+        vi.advanceTimersByTime(200);
+        expect(touch('touchmove', other)).toBe(false);
+        touch('touchend', other);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does nothing when let go outside any day, e.g. below the week', async () => {
+      dragDrop.set(true);
+      const { schedules, element, fixture } = await render(withRows);
+
+      // The CDK still has it in Saturday, the last day it passed over
+      drop(fixture.componentInstance, vacuum, '2026-11-14', false);
+      await fixture.whenStable();
+
+      expect(schedules.move).not.toHaveBeenCalled();
+      expect(rowsOn(element, 3)).toContain('Vacuum');
+      expect(rowsOn(element, 6)).toEqual([]);
+    });
+
+    it('does nothing when dropped back on its own day', async () => {
+      dragDrop.set(true);
+      const { schedules, fixture } = await render(withRows);
+
+      drop(fixture.componentInstance, vacuum, '2026-11-11');
+
+      expect(schedules.move).not.toHaveBeenCalled();
+    });
+
+    it('puts the row back and shows why when saving fails', async () => {
+      dragDrop.set(true);
+      const { element, fixture } = await render(withRows, undefined, undefined, undefined, () =>
+        throwError(() => new HttpErrorResponse({ status: 400, error: { detail: 'Pick today or a later day.' } })),
+      );
+
+      drop(fixture.componentInstance, vacuum, '2026-11-13');
+      await fixture.whenStable();
+
+      expect(rowsOn(element, 3)).toContain('Vacuum');
+      expect(rowsOn(element, 5)).toEqual([]);
+      expect(element.querySelector('.item-error')?.textContent).toBe('Pick today or a later day.');
+    });
+
+    it('reloads the week with a notice when the day changed meanwhile (BILLIAMVT-55)', async () => {
+      dragDrop.set(true);
+      let calls = 0;
+      const doneBySam = { ...vacuum, status: 'DONE' as const, completedById: 2, completedByName: 'Sam' };
+      const { element, fixture } = await render(
+        (from, to) => of(schedule(from, to, [calls++ === 0 ? vacuum : doneBySam])),
+        undefined,
+        undefined,
+        undefined,
+        () => throwError(() => new HttpErrorResponse({ status: 409 })),
+      );
+
+      drop(fixture.componentInstance, vacuum, '2026-11-13');
+      await fixture.whenStable();
+
+      expect(notice(element)).toBe('Sam already marked Vacuum done. Your week is up to date.');
+      expect(rowsOn(element, 3)).toEqual(['Vacuum']);
     });
   });
 

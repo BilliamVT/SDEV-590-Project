@@ -3,6 +3,7 @@ import { Router, RouterLink, RouterOutlet } from '@angular/router';
 
 import { AuthService } from './auth/auth.service';
 import { Announcer } from './shared/announcer';
+import { Toast } from './shared/toast';
 
 @Component({
   imports: [RouterLink, RouterOutlet],
@@ -14,6 +15,7 @@ export class App {
   private readonly router = inject(Router);
   protected readonly auth = inject(AuthService);
   protected readonly announcer = inject(Announcer);
+  protected readonly toast = inject(Toast);
 
   protected logout(): void {
     this.auth.logout();

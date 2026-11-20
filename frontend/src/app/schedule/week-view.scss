@@ -31,6 +31,8 @@
 }
 
 .day {
+  // So a day held at its height while a row is dragged from it (BILLIAMVT-28) keeps exactly that height
+  box-sizing: border-box;
   padding: var(--space-2) var(--space-3);
   border-left: 4px solid transparent;
 
@@ -176,3 +178,46 @@
 .move-field {
   margin: 0 0 var(--space-4);
 }
+
+// Drag-and-drop (BILLIAMVT-28). A draggable row is picked up by pressing and holding on a phone,
+// so iOS's long-press text callout is turned off for it.
+.occurrence.draggable {
+  -webkit-touch-callout: none;
+  user-select: none;
+  cursor: grab;
+}
+
+// The row following the pointer is styled in styles.scss: it lives at the end of the page
+
+// Where the row was: faint while it's dragged, keeping its space so the days below don't move up
+.occurrence.cdk-drag-placeholder {
+  opacity: 0.35;
+}
+
+// The other days don't make room for it, so the week stays still under the finger; the dashed
+// outline shows where it will land, and it appears there once dropped
+.day.drop-target .cdk-drag-placeholder {
+  display: none;
+}
+
+// With drag-and-drop on, an empty day is 56 px tall: easy to drop on with a finger, and closer to a
+// one-task day (88 px), so it grows less when a row lands on it, while still reading as a compact
+// line. Always, not just while dragging, so the week doesn't shift under the finger.
+.days.drag-enabled .day.empty-day {
+  min-height: 3.5rem;
+  align-items: center;
+}
+
+// Days before today don't accept a drop, so they dim while dragging
+.days.dragging .day.past {
+  opacity: 0.4;
+}
+
+// The day under the finger, where letting go will drop the row; no outline means it would cancel
+.day.drop-over {
+  outline: 2px dashed var(--color-focus);
+  outline-offset: -2px;
+}
+
+// No drop animation: the CDK would fly the card to its hidden copy on the target day (the top of
+// the screen). The row is already on its new day under the finger, so the card just disappears.
