@@ -57,13 +57,14 @@
   }
 
   @if (needsStartDate()) {
-    <label for="task-start">Starting</label>
-    <input id="task-start" [attr.aria-invalid]="(attempted() && startInvalid()) || null" [attr.aria-describedby]="(attempted() && startInvalid()) ? 'task-start-error' : null" type="date" formControlName="startsOn" [min]="minStart()" />
+    <!-- A one-time task's day, or a repeating task's start (BILLIAMVT-59) -->
+    <label for="task-start">{{ once() ? 'On' : 'Starting' }}</label>
+    <input id="task-start" [attr.aria-invalid]="(attempted() && startInvalid()) || null" [attr.aria-describedby]="(attempted() && startInvalid()) ? 'task-start-error' : null" type="date" formControlName="startsOn" [min]="minStart()" [attr.max]="once() ? maxOnce() : null" />
     @if (preview(); as text) {
       <p class="preview" aria-live="polite">{{ text }}</p>
     }
     @if (attempted() && startInvalid()) {
-      <p class="field-error" id="task-start-error">Choose a start date from today on.</p>
+      <p class="field-error" id="task-start-error">{{ once() ? 'Choose a day from today on.' : 'Choose a start date from today on.' }}</p>
     }
   }
 

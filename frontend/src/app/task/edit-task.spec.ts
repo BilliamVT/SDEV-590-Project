@@ -78,6 +78,13 @@ describe('NewTask (editing)', () => {
     expect(value('task-minutes')).toBe('5');
   });
 
+  it("doesn't offer Never: an existing task keeps a schedule (BILLIAMVT-59)", async () => {
+    const { element } = await render();
+    const options = [...element.querySelectorAll<HTMLOptionElement>('#task-frequency option')].map((o) => o.value);
+    expect(options).not.toContain('ONCE');
+    expect(options).toContain('DAILY');
+  });
+
   it("keeps a start date that's already in the past, and allows picking it", async () => {
     const { tasks, router, element, set, submit } = await render();
     expect(element.querySelector<HTMLInputElement>('#task-start')?.min).toBe('2026-11-02');

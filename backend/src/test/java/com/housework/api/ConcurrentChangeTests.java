@@ -117,7 +117,7 @@ class ConcurrentChangeTests {
 	@Test
 	void anItemMarkedDoneWhileSomeoneSchedulesItEndsUpOnOneDay() {
 		Member pat = member();
-		long itemId = backlogService.create(pat.id, new CreateItemRequest("Hang shelves", null)).id();
+		long itemId = backlogService.create(pat.id, new CreateItemRequest("Hang shelves", null, null)).id();
 
 		CompletableFuture<?> schedule = overlapping(() -> backlogService.done(pat.id, itemId, today),
 				() -> backlogService.schedule(pat.id, itemId, today.plusDays(3)));

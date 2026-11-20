@@ -8,4 +8,6 @@ export interface BacklogItem {
 export interface CreateItemRequest {
   name: string;
   estimatedMinutes?: number;
+  /** Straight onto this day instead of the backlog (BILLIAMVT-59) */
+  date?: string;
 }
