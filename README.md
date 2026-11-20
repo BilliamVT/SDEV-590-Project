@@ -237,4 +237,14 @@ node .github/scripts/delivery-metrics.mjs
 
 Tests for the script: `node --test '.github/scripts/*.test.mjs'`.
 
+### Household usage
+
+The share of scheduled days the household completes, by week (BILLIAMVT-31), comes from a read-only query against production, `docs/metrics/completion-share.sql`. It runs in a read-only transaction, so Postgres refuses any write. Copy the **External Database URL** from Render (the Postgres instance → **Connect** → **External**) and run it with `psql`, or with Docker if `psql` isn't installed; never commit the URL, which contains the password:
+
+```bash
+docker run --rm -i postgres:18 psql "<external database URL>" < docs/metrics/completion-share.sql
+```
+
+It lists each household's weeks from the household's first full week, Sunday Nov 22 (Sunday to Saturday, as in the app) with the days due before today, done, skipped and missed. Copy the household's row into the **Household Usage** tab of the "Capstone Sprint Metrics" sheet, where the percentages are formulas. One-off backlog items and the smoke test's household are left out (reasons at the top of the query). Feedback from the household goes in the **Household Feedback** tab.
+
 [Decision 0001](docs/decisions/0001-hosting-and-database.md) explains why these services were chosen.
