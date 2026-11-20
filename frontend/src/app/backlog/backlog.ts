@@ -6,6 +6,7 @@ import { Observable } from 'rxjs';
 import { errorMessage } from '../auth/error-message';
 import { HouseholdService } from '../household/household.service';
 import { Announcer } from '../shared/announcer';
+import { Toast } from '../shared/toast';
 import { focusFirstInvalid, focusLater } from '../shared/focus';
 import { dayLabel } from '../schedule/dates';
 import { isStale } from '../schedule/stale';
@@ -40,6 +41,7 @@ interface Picking {
 export class Backlog {
   private readonly host = inject(ElementRef<HTMLElement>).nativeElement;
   private readonly announcer = inject(Announcer);
+  private readonly toast = inject(Toast);
   private readonly backlog = inject(BacklogService);
   private readonly households = inject(HouseholdService);
 
@@ -183,8 +185,8 @@ export class Backlog {
         : `"${item.name}" is on ${dayLabel(picking.date)}.`;
     this.run(item, request, () => {
       this.picking.set(null);
-      // The visible notice is a status message, so screen readers read it out too
-      this.notice.set(message);
+      // A toast that goes away on its own (BILLIAMVT-57); screen readers hear it too
+      this.toast.show(message);
       this.placed.emit();
       this.focusHeading();
     });

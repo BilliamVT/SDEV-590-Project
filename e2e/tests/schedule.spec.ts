@@ -7,7 +7,7 @@ test('a new daily task shows today, and can be marked done and undone', async ({
 
   await addTask(page, 'Vacuum', 'Every day');
 
-  await expect(page.getByRole('status')).toContainText('Saved: Vacuum, every day.');
+  await expect(page.locator('.toast')).toContainText('Saved: Vacuum, every day.');
   await expect(today(page).getByText('Vacuum')).toBeVisible();
 
   await today(page).getByRole('button', { name: 'Mark Vacuum done' }).click();
@@ -108,7 +108,7 @@ test('a weekly task on several days shows on exactly those days', async ({ page 
 
   // Chosen out of order: the app sorts them
   await addTask(page, 'Laundry', 'Every week', ['Thursday', 'Monday']);
-  await expect(page.getByRole('status')).toContainText('Saved: Laundry, every week on Monday and Thursday.');
+  await expect(page.locator('.toast')).toContainText('Saved: Laundry, every week on Monday and Thursday.');
 
   // Next week is entirely in the future, so each chosen day has its occurrence whatever today is
   await page.getByRole('button', { name: /^Next/ }).click();
