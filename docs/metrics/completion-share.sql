@@ -6,8 +6,9 @@
 -- and record the household's weekly row in the "Capstone Sprint Metrics" sheet.
 --
 -- What counts:
---   * Days of recurring tasks, Sunday to Saturday weeks (as in the app), from the household's first
---     full week (Sun Nov 22) on; earlier use was pre-rollout testing.
+--   * Days of recurring tasks, and one-time tasks planned ahead (BILLIAMVT-59), in Sunday to Saturday
+--     weeks (as in the app), from the household's first full week (Sun Nov 22) on; earlier use was
+--     pre-rollout testing.
 --   * Only days before today in the household's time zone: today can still be done.
 --   * due = every such day; done / skipped by status; missed = still pending.
 --   * done_pct = done ÷ due. done_pct_excl_skipped = done ÷ (due − skipped), since a skip is a
@@ -15,12 +16,14 @@
 --   * Days of deleted tasks are kept as history, so they still count.
 -- Left out:
 --   * The smoke test's household (BILLIAMVT-48), which has no tasks anyway.
---   * One-off backlog items: marking one done adds a day that was never scheduled, which would
---     inflate the share.
+--   * One-off items logged after the fact: "Mark done" on an earlier day from the backlog adds a day
+--     that was never planned, which would inflate the share. A one-off counts only if its day was
+--     added on or before that day (in the household's time zone), as when it's added with Never
+--     (one time) or scheduled from the backlog.
 begin transaction read only;
 
 with households as (
-    select id, name, (now() at time zone time_zone)::date as today
+    select id, name, time_zone, (now() at time zone time_zone)::date as today
     from household
     where name <> 'Smoke test'
 ),
@@ -31,7 +34,8 @@ days as (
     from occurrence o
     join task t on t.id = o.task_id
     join households h on h.id = t.household_id
-    where t.recurrence_rule is not null
+    where (t.recurrence_rule is not null
+           or (o.created_at at time zone h.time_zone)::date <= o.scheduled_date)
       and o.scheduled_date >= date '2026-11-22' -- the household week starts Sun Nov 22 (Change Log)
       and o.scheduled_date < h.today
 )
