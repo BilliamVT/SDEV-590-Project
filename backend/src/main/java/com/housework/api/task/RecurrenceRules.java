@@ -2,6 +2,7 @@ package com.housework.api.task;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.format.TextStyle;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,6 +28,9 @@ final class RecurrenceRules {
 
 	static final int MAX_INTERVAL_WEEKS = 52;
 
+	/** 12 months is Every year, a separate menu option. */
+	static final int MAX_INTERVAL_MONTHS = 11;
+
 	/** Days 29–31 are left out: a monthly rule skips months that don't have them. -1 is the last day. */
 	static final int MAX_DAY_OF_MONTH = 28;
 
@@ -44,8 +48,9 @@ final class RecurrenceRules {
 	}
 
 	/**
-	 * The rule for a schedule. {@code startsOn} is only used for quarterly rules, which repeat
-	 * on its day of the month (the last day if it's after the 28th).
+	 * The rule for a schedule. {@code startsOn} is only used for rules every few months, which repeat
+	 * on its day of the month (the last day if it's after the 28th), and yearly ones, which repeat on
+	 * its month and day (Feb 29 becomes the last day of February, so no year is skipped).
 	 */
 	static String build(Frequency frequency, Integer interval, Collection<DayOfWeek> daysOfWeek, Integer dayOfMonth,
 			LocalDate startsOn) {
@@ -58,8 +63,11 @@ final class RecurrenceRules {
 			case EVERY_N_WEEKS -> "FREQ=WEEKLY;INTERVAL=" + interval(interval, MAX_INTERVAL_WEEKS, "weeks")
 					+ ";WKST=SU;BYDAY=" + byDays(daysOfWeek);
 			case MONTHLY -> "FREQ=MONTHLY;BYMONTHDAY=" + dayOfMonth(dayOfMonth);
-			case QUARTERLY -> "FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY="
-					+ (startsOn.getDayOfMonth() > MAX_DAY_OF_MONTH ? LAST_DAY_OF_MONTH : startsOn.getDayOfMonth());
+			case QUARTERLY -> everyFewMonths(3, startsOn);
+			case EVERY_N_MONTHS -> everyFewMonths(interval(interval, MAX_INTERVAL_MONTHS, "months"), startsOn);
+			case YEARLY -> "FREQ=YEARLY;BYMONTH=" + startsOn.getMonthValue() + ";BYMONTHDAY="
+					+ (startsOn.getMonthValue() == 2 && startsOn.getDayOfMonth() == 29 ? LAST_DAY_OF_MONTH
+							: startsOn.getDayOfMonth());
 		};
 		try {
 			new Recur<LocalDate>(rule);
@@ -68,6 +76,12 @@ final class RecurrenceRules {
 			throw new IllegalStateException("Built an invalid rule: " + rule, ex);
 		}
 		return rule;
+	}
+
+	/** Every few months on the start date's day, or the last day if it's after the 28th. */
+	private static String everyFewMonths(int interval, LocalDate startsOn) {
+		return "FREQ=MONTHLY;INTERVAL=" + interval + ";BYMONTHDAY="
+				+ (startsOn.getDayOfMonth() > MAX_DAY_OF_MONTH ? LAST_DAY_OF_MONTH : startsOn.getDayOfMonth());
 	}
 
 	/** The menu fields a rule was built from, to fill in the edit form (BILLIAMVT-22). */
@@ -85,8 +99,10 @@ final class RecurrenceRules {
 					: new MenuChoice(Frequency.EVERY_N_DAYS, interval, null, null);
 			case "WEEKLY" -> interval == null ? new MenuChoice(Frequency.WEEKLY, null, days, null)
 					: new MenuChoice(Frequency.EVERY_N_WEEKS, interval, days, null);
+			// Every 3 months reads back as every few months with 3 (BILLIAMVT-60)
 			case "MONTHLY" -> interval == null ? new MenuChoice(Frequency.MONTHLY, null, null, dayOfMonth)
-					: new MenuChoice(Frequency.QUARTERLY, null, null, null);
+					: new MenuChoice(Frequency.EVERY_N_MONTHS, interval, null, null);
+			case "YEARLY" -> new MenuChoice(Frequency.YEARLY, null, null, null);
 			default -> throw new IllegalArgumentException("Not a rule from the task menu: " + rule);
 		};
 	}
@@ -101,6 +117,8 @@ final class RecurrenceRules {
 			case "WEEKLY" -> (interval == 1 ? "Every week" : "Every " + interval + " weeks") + day;
 			case "MONTHLY" -> (interval == 1 ? "Every month" : "Every " + interval + " months") + " on the "
 					+ dayOfMonthName(Integer.parseInt(parts.get("BYMONTHDAY")));
+			case "YEARLY" -> "Every year on " + yearlyDay(Integer.parseInt(parts.get("BYMONTH")),
+					Integer.parseInt(parts.get("BYMONTHDAY")));
 			default -> throw new IllegalArgumentException("Not a rule from the task menu: " + rule);
 		};
 	}
@@ -168,6 +186,14 @@ final class RecurrenceRules {
 			}
 		}
 		throw new IllegalArgumentException("Unknown day: " + byDay);
+	}
+
+	/** Nov 22, or "the last day of February" */
+	private static String yearlyDay(int month, int day) {
+		String name = Month.of(month).getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+		return day == LAST_DAY_OF_MONTH
+				? "the last day of " + Month.of(month).getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+				: name + " " + day;
 	}
 
 	/** 1 → 1st, 22 → 22nd, -1 → last day */

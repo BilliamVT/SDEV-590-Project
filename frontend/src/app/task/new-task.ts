@@ -14,16 +14,17 @@ import { TaskService } from './task.service';
 /** Sunday first, like the week view; the index matches JavaScript's getDay(). */
 const DAYS: DayOfWeek[] = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
-/** Same limits as the backend's RecurrenceRules. */
 /**
  * The Repeats menu: a schedule, or Never for a one-time task on a day (BILLIAMVT-59). A one-time
  * task is a one-off item put straight on that day, not a task with a schedule.
  */
 type Repeats = Frequency | 'ONCE';
 
+/** Same limits as the backend's RecurrenceRules. 12 months is Every year (BILLIAMVT-60). */
 const INTERVAL_LIMITS: Partial<Record<Frequency, { max: number; unit: string }>> = {
   EVERY_N_DAYS: { max: 90, unit: 'days' },
   EVERY_N_WEEKS: { max: 52, unit: 'weeks' },
+  EVERY_N_MONTHS: { max: 11, unit: 'months' },
 };
 
 /**
@@ -54,7 +55,9 @@ export class NewTask {
     { value: 'EVERY_N_DAYS', label: 'Every few days' },
     { value: 'EVERY_N_WEEKS', label: 'Every few weeks' },
     { value: 'MONTHLY', label: 'Every month' },
-    { value: 'QUARTERLY', label: 'Every 3 months' },
+    // Every few months replaces Every 3 months; Every year is its own option (BILLIAMVT-60)
+    { value: 'EVERY_N_MONTHS', label: 'Every few months' },
+    { value: 'YEARLY', label: 'Every year' },
     // Only when adding: an existing task keeps a schedule (BILLIAMVT-59)
     ...(this.taskId === null ? [{ value: 'ONCE' as Repeats, label: 'Never (one time)' }] : []),
   ];
@@ -169,7 +172,7 @@ export class NewTask {
 
   /** A start date, or for a one-time task its day. */
   protected needsStartDate(): boolean {
-    return this.intervalLimit() !== undefined || this.frequency() === 'QUARTERLY' || this.once();
+    return this.intervalLimit() !== undefined || this.frequency() === 'QUARTERLY' || this.frequency() === 'YEARLY' || this.once();
   }
 
   /**
@@ -194,12 +197,20 @@ export class NewTask {
         break;
       }
       case 'QUARTERLY':
+      case 'EVERY_N_MONTHS': {
+        // After the 28th it's the last day of each month, so February isn't skipped
+        const months = this.frequency() === 'QUARTERLY' ? 3 : value.interval;
         if (day > 28) {
           first = new Date(year, month, 0);
-          then = 'every 3 months on the last day';
+          then = `every ${months} months on the last day`;
         } else {
-          then = 'every 3 months';
+          then = `every ${months} months`;
         }
+        break;
+      }
+      case 'YEARLY':
+        // Feb 29 repeats on the last day of February, so no year is skipped
+        then = month === 2 && day === 29 ? 'every year on the last day of February' : 'every year';
         break;
       default:
         then = `every ${value.interval} days`;
