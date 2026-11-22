@@ -88,6 +88,32 @@ class TaskTests {
 	}
 
 	@Test
+	void everyFewMonthsAndYearlyTasksKeepTheirChosenStartDate() {
+		String token = registerWithHousehold("pat@example.com", "America/New_York");
+		LocalDate start = LocalDate.now(ZoneId.of("America/New_York")).plusDays(3);
+
+		// BILLIAMVT-60
+		MvcTestResult filter = create(token, """
+				{"name": "Furnace filter", "frequency": "EVERY_N_MONTHS", "interval": 6, "startsOn": "%s"}
+				""".formatted(start));
+		MvcTestResult gutters = create(token, """
+				{"name": "Gutters", "frequency": "YEARLY", "startsOn": "%s"}
+				""".formatted(start));
+
+		assertThat(filter).hasStatus(201);
+		assertThat(text(filter, "$.startsOn")).isEqualTo(start.toString());
+		assertThat(text(filter, "$.frequency")).isEqualTo("EVERY_N_MONTHS");
+		assertThat(text(filter, "$.schedule")).startsWith("Every 6 months on the ");
+		assertThat(gutters).hasStatus(201);
+		assertThat(text(gutters, "$.startsOn")).isEqualTo(start.toString());
+		assertThat(text(gutters, "$.frequency")).isEqualTo("YEARLY");
+		assertThat(text(gutters, "$.schedule")).startsWith("Every year on ");
+		assertThat(create(token, """
+				{"name": "Too often", "frequency": "EVERY_N_MONTHS", "interval": 12, "startsOn": "%s"}
+				""".formatted(start))).hasStatus(400);
+	}
+
+	@Test
 	void everyNWeeksStartsOnTheFirstChosenWeekdayOnOrAfterTheStartDate() {
 		String token = registerWithHousehold("pat@example.com", "America/New_York");
 		LocalDate start = LocalDate.now(ZoneId.of("America/New_York")).plusDays(1);

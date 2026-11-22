@@ -1,5 +1,14 @@
 /** Shapes of the backend's /api/tasks requests and responses (backend TaskDtos). */
-export type Frequency = 'DAILY' | 'WEEKLY' | 'EVERY_N_DAYS' | 'EVERY_N_WEEKS' | 'MONTHLY' | 'QUARTERLY';
+/** QUARTERLY is no longer in the menu: every 3 months is EVERY_N_MONTHS with 3 (BILLIAMVT-60). */
+export type Frequency =
+  | 'DAILY'
+  | 'WEEKLY'
+  | 'EVERY_N_DAYS'
+  | 'EVERY_N_WEEKS'
+  | 'MONTHLY'
+  | 'QUARTERLY'
+  | 'EVERY_N_MONTHS'
+  | 'YEARLY';
 
 export type DayOfWeek = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
 

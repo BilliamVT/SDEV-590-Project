@@ -158,8 +158,46 @@ describe('NewTask', () => {
     expect(shown()).toEqual(['task-interval', 'task-day', 'task-start']);
     await set('task-frequency', 'MONTHLY');
     expect(shown()).toEqual(['task-day-of-month']);
-    await set('task-frequency', 'QUARTERLY');
+    await set('task-frequency', 'EVERY_N_MONTHS');
+    expect(shown()).toEqual(['task-interval', 'task-start']);
+    await set('task-frequency', 'YEARLY');
     expect(shown()).toEqual(['task-start']);
+  });
+
+  it('offers every few months and every year in place of every 3 months (BILLIAMVT-60)', async () => {
+    const { element } = await render();
+    const labels = [...element.querySelectorAll<HTMLOptionElement>('#task-frequency option')].map((o) => o.textContent?.trim());
+    expect(labels).toContain('Every few months');
+    expect(labels).toContain('Every year');
+    expect(labels).not.toContain('Every 3 months');
+  });
+
+  it('sends every-few-months and yearly tasks with their start date (BILLIAMVT-60)', async () => {
+    const { tasks, element, set, submit } = await render();
+    await set('task-name', 'Furnace filter');
+    await set('task-frequency', 'EVERY_N_MONTHS');
+    expect(element.querySelector('label[for="task-interval"]')?.textContent).toBe('Every how many months?');
+    await set('task-interval', '6');
+    await set('task-start', '2026-11-07');
+    await submit();
+    expect(tasks.create).toHaveBeenLastCalledWith({ name: 'Furnace filter', frequency: 'EVERY_N_MONTHS', interval: 6, startsOn: '2026-11-07' });
+
+    await set('task-name', 'Gutters');
+    await set('task-frequency', 'YEARLY');
+    await set('task-start', '2026-11-07');
+    await submit();
+    expect(tasks.create).toHaveBeenLastCalledWith({ name: 'Gutters', frequency: 'YEARLY', startsOn: '2026-11-07' });
+  });
+
+  it('allows every 2 to 11 months; 12 is Every year (BILLIAMVT-60)', async () => {
+    const { tasks, element, set, submit } = await render();
+    await set('task-name', 'Furnace filter');
+    await set('task-frequency', 'EVERY_N_MONTHS');
+    await set('task-interval', '12');
+    await submit();
+
+    expect(tasks.create).not.toHaveBeenCalled();
+    expect(element.textContent).toContain('Enter a whole number from 2 to 11.');
   });
 
   it('sends every-N-days tasks with their interval and start date', async () => {
@@ -237,11 +275,15 @@ describe('NewTask', () => {
     await set('task-interval', '10');
     expect(preview()).toBe('First time: Friday, Nov 13, 2026, then every 10 days.');
 
-    await set('task-frequency', 'QUARTERLY');
+    await set('task-frequency', 'EVERY_N_MONTHS');
+    await set('task-interval', '6');
     await set('task-start', '2026-12-31');
-    expect(preview()).toBe('First time: Thursday, Dec 31, 2026, then every 3 months on the last day.');
+    expect(preview()).toBe('First time: Thursday, Dec 31, 2026, then every 6 months on the last day.');
     await set('task-start', '2026-11-15');
-    expect(preview()).toBe('First time: Sunday, Nov 15, 2026, then every 3 months.');
+    expect(preview()).toBe('First time: Sunday, Nov 15, 2026, then every 6 months.');
+
+    await set('task-frequency', 'YEARLY');
+    expect(preview()).toBe('First time: Sunday, Nov 15, 2026, then every year.');
   });
 
   it("doesn't allow a start date in the past", async () => {
@@ -296,7 +338,7 @@ describe('NewTask', () => {
     const rejected = new HttpErrorResponse({ status: 400, error: { detail: 'Choose a start date within a year of today.' } });
     const { element, set, submit } = await render(() => throwError(() => rejected));
     await set('task-name', 'Gutters');
-    await set('task-frequency', 'QUARTERLY');
+    await set('task-frequency', 'YEARLY');
     await set('task-start', '2030-01-01');
     await submit();
 

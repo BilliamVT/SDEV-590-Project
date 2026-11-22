@@ -28,6 +28,9 @@ class RecurrenceRulesTests {
 			MONTHLY       |    |          | 11 | FREQ=MONTHLY;BYMONTHDAY=11          | Every month on the 11th
 			MONTHLY       |    |          | -1 | FREQ=MONTHLY;BYMONTHDAY=-1          | Every month on the last day
 			QUARTERLY     |    |          |    | FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=4 | Every 3 months on the 4th
+			EVERY_N_MONTHS | 6 |          |    | FREQ=MONTHLY;INTERVAL=6;BYMONTHDAY=4 | Every 6 months on the 4th
+			EVERY_N_MONTHS | 2 |          |    | FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=4 | Every 2 months on the 4th
+			YEARLY        |    |          |    | FREQ=YEARLY;BYMONTH=11;BYMONTHDAY=4  | Every year on Nov 4
 			""")
 	void buildsAndDescribesEachMenuChoice(Frequency frequency, Integer interval, DayOfWeek dayOfWeek,
 			Integer dayOfMonth, String rule, String description) {
@@ -43,7 +46,8 @@ class RecurrenceRulesTests {
 			EVERY_N_WEEKS | 2  | MONDAY   |
 			MONTHLY       |    |          | 15
 			MONTHLY       |    |          | -1
-			QUARTERLY     |    |          |
+			EVERY_N_MONTHS | 6 |          |
+			YEARLY        |    |          |
 			""")
 	void readsARuleBackIntoItsMenuChoice(Frequency frequency, Integer interval, DayOfWeek dayOfWeek, Integer dayOfMonth) {
 		String rule = RecurrenceRules.build(frequency, interval, days(dayOfWeek), dayOfMonth, START);
@@ -64,6 +68,43 @@ class RecurrenceRulesTests {
 					LocalDate.of(2027, 8, 31));
 	}
 
+	/** Every 3 months, built before BILLIAMVT-60 or by an older client, opens as every few months with 3. */
+	@Test
+	void quarterlyReadsBackAsEveryFewMonths() {
+		String rule = RecurrenceRules.build(Frequency.QUARTERLY, null, null, null, START);
+
+		assertThat(rule).isEqualTo(RecurrenceRules.build(Frequency.EVERY_N_MONTHS, 3, null, null, START));
+		assertThat(RecurrenceRules.parse(rule))
+			.isEqualTo(new RecurrenceRules.MenuChoice(Frequency.EVERY_N_MONTHS, 3, null, null));
+	}
+
+	@Test
+	void everyFewMonthsFromALateDayUsesTheLastDayOfTheMonth() {
+		String rule = RecurrenceRules.build(Frequency.EVERY_N_MONTHS, 6, null, null, LocalDate.of(2026, 8, 31));
+
+		assertThat(rule).isEqualTo("FREQ=MONTHLY;INTERVAL=6;BYMONTHDAY=-1");
+		assertThat(RecurrenceRules.describe(rule)).isEqualTo("Every 6 months on the last day");
+		// February is never skipped
+		assertThat(new Recur<LocalDate>(rule).getDates(LocalDate.of(2026, 8, 31), LocalDate.of(2026, 8, 1),
+				LocalDate.of(2027, 9, 1)))
+			.containsExactly(LocalDate.of(2026, 8, 31), LocalDate.of(2027, 2, 28), LocalDate.of(2027, 8, 31));
+	}
+
+	@Test
+	void yearlyKeepsLateDaysAndMovesFebruary29ToTheLastDay() {
+		String jan31 = RecurrenceRules.build(Frequency.YEARLY, null, null, null, LocalDate.of(2027, 1, 31));
+		assertThat(jan31).isEqualTo("FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=31");
+		assertThat(RecurrenceRules.describe(jan31)).isEqualTo("Every year on Jan 31");
+
+		String leapDay = RecurrenceRules.build(Frequency.YEARLY, null, null, null, LocalDate.of(2028, 2, 29));
+		assertThat(leapDay).isEqualTo("FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1");
+		assertThat(RecurrenceRules.describe(leapDay)).isEqualTo("Every year on the last day of February");
+		// No year is skipped
+		assertThat(new Recur<LocalDate>(leapDay).getDates(LocalDate.of(2028, 2, 29), LocalDate.of(2028, 1, 1),
+				LocalDate.of(2031, 1, 1)))
+			.containsExactly(LocalDate.of(2028, 2, 29), LocalDate.of(2029, 2, 28), LocalDate.of(2030, 2, 28));
+	}
+
 	@Test
 	void intervalsMustBeWithinTheLimits() {
 		assertThat(RecurrenceRules.build(Frequency.EVERY_N_DAYS, 90, null, null, START)).endsWith("INTERVAL=90");
@@ -73,6 +114,9 @@ class RecurrenceRulesTests {
 		assertInvalid(Frequency.EVERY_N_DAYS, 91, null, null, "Repeat every 2 to 90 days.");
 		assertInvalid(Frequency.EVERY_N_WEEKS, 53, DayOfWeek.SUNDAY, null, "Repeat every 2 to 52 weeks.");
 		assertInvalid(Frequency.EVERY_N_DAYS, null, null, null, "Repeat every 2 to 90 days.");
+		assertThat(RecurrenceRules.build(Frequency.EVERY_N_MONTHS, 11, null, null, START)).contains("INTERVAL=11");
+		assertInvalid(Frequency.EVERY_N_MONTHS, 1, null, null, "Repeat every 2 to 11 months.");
+		assertInvalid(Frequency.EVERY_N_MONTHS, 12, null, null, "Repeat every 2 to 11 months.");
 	}
 
 	@Test

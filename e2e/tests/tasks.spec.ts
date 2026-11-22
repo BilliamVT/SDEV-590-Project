@@ -1,6 +1,6 @@
 import { type Page, expect, test } from '@playwright/test';
 
-import { addTask, signUpWithHousehold, today, confirmSheet } from './helpers';
+import { addTask, confirmSheet, formReady, signUpWithHousehold, today } from './helpers';
 
 /** Changes made on the Tasks page show in the week on the home page. */
 test('editing, pausing, resuming and deleting a task changes the week', async ({ page }) => {
@@ -75,4 +75,29 @@ test('saving a new task confirms it in a toast that offers to add another (BILLI
   await toast.getByRole('button', { name: /^Add another/ }).click();
   await expect(page).toHaveURL(/\/tasks\/new$/);
   await expect(toast).toBeHidden();
+});
+
+test('a task can repeat every few months or every year (BILLIAMVT-60)', async ({ page }) => {
+  await signUpWithHousehold(page, 'Pat');
+
+  // Every 6 months, starting today (the start date's default)
+  await page.getByRole('link', { name: 'Add a task' }).click();
+  const taskName = page.getByLabel('Task', { exact: true });
+  await formReady(taskName);
+  await taskName.fill('Furnace filter');
+  await page.getByLabel('Repeats').selectOption({ label: 'Every few months' });
+  await page.getByLabel('Every how many months?').fill('6');
+  await expect(page.locator('.preview')).toContainText('then every 6 months');
+  await page.getByRole('button', { name: 'Save task' }).click();
+  await expect(page.locator('.toast')).toContainText(/Saved: Furnace filter, every 6 months on the (\d{1,2}(st|nd|rd|th)|last day)\./);
+  await expect(today(page).getByText('Furnace filter')).toBeVisible();
+
+  await addTask(page, 'Gutters', 'Every year');
+  await expect(page.locator('.toast')).toContainText(/Saved: Gutters, every year on (\w{3} \d{1,2}|the last day of February)\./);
+
+  // Editing opens the same choice
+  await page.getByRole('link', { name: 'Your tasks' }).click();
+  await page.locator('.task').filter({ hasText: 'Furnace filter' }).getByRole('link', { name: 'Edit' }).click();
+  await expect(page.getByLabel('Repeats')).toHaveValue('EVERY_N_MONTHS');
+  await expect(page.getByLabel('Every how many months?')).toHaveValue('6');
 });

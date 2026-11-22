@@ -36,7 +36,7 @@ public class TaskService {
 
 	/** Frequencies whose start date the user picks; the others start today. */
 	private static final Set<Frequency> CHOSEN_START = EnumSet.of(Frequency.EVERY_N_DAYS, Frequency.EVERY_N_WEEKS,
-			Frequency.QUARTERLY);
+			Frequency.QUARTERLY, Frequency.EVERY_N_MONTHS, Frequency.YEARLY);
 
 	/** How far ahead a chosen start date may be. */
 	private static final int MAX_START_YEARS = 1;
