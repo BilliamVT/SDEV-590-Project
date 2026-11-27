@@ -26,6 +26,12 @@ jobs:
     name: Smoke test production
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    # Its own environment, so the latest result and when it ran show in the repository's
+    # Deployments box next to github-pages and production (BILLIAMVT-73). It deploys nothing, and
+    # the delivery metrics only read the Deploy workflow, so they're unaffected.
+    environment:
+      name: smoke-test
+      url: https://billiamvt.github.io/SDEV-590-Project/
     # Playwright's own image: Node, Chromium, WebKit and their system libraries are preinstalled,
     # so there's no browser download or apt step to stall (two stalls on Nov 18). Keep the version
     # in step with @playwright/test in e2e/package.json.
