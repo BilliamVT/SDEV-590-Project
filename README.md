@@ -1,5 +1,9 @@
 # Housework Scheduler
 
+[![CI](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/ci.yml?query=branch%3Amain)
+[![Deploy](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/deploy.yml?query=branch%3Amain)
+[![Smoke test](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/smoke.yml/badge.svg?branch=main)](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/smoke.yml?query=branch%3Amain)
+
 An app for scheduling recurring housework that a household shares: you enter recurring chores and the app generates a schedule for everyone. This is an MVP built as the SDEV 590 capstone at Champlain College.
 
 ## Repository layout
@@ -204,7 +208,7 @@ How a merge reaches production:
 1. **CI** (`.github/workflows/ci.yml`) builds and tests the changed parts of the merge commit on `main`. On pull requests, "Backend build and test" and "Frontend build and test" are required checks; a skipped job counts as passing.
 2. **Deploy** (`.github/workflows/deploy.yml`) runs when CI passes:
    - **Backend:** asks Render's API to deploy that exact commit, waits until it's live, then checks `/actuator/health`. Flyway migrations run when the new version starts.
-   - **Front end:** builds the Angular app for `/SDEV-590-Project/` and publishes it to GitHub Pages.
+   - **Front end:** one job builds the Angular app for `/SDEV-590-Project/` and uploads it, and the next publishes it to GitHub Pages. They're separate jobs, as in GitHub's Pages template, because publishing straight after the upload sometimes failed with "No artifacts named github-pages were found" (BILLIAMVT-73). If a publish fails anyway, start a new Deploy run rather than re-running the failed one.
 3. The Deploy run passes only if every deploy it started succeeded. A failure shows as a failed run in the **Actions** tab, and the previous version keeps running.
 
 To redeploy without a merge, for example after changing an environment variable on Render, open **Actions → Deploy → Run workflow** on `main`. A manual run deploys both parts.

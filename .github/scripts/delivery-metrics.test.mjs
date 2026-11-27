@@ -31,6 +31,14 @@ test('a run whose deploy jobs were all skipped is not a deployment', () => {
   assert.equal(run.failed, false);
 });
 
+test('a front-end build that failed before publishing is not a deployment or a failure (BILLIAMVT-73)', () => {
+  // The build job isn't a deploy job; the publish job is skipped when its build fails
+  const build = { name: 'Build frontend for GitHub Pages', conclusion: 'failure', completed_at: '2026-10-28T17:30:00Z', steps: [] };
+  const run = classifyRun([changes, build, frontend('skipped', null), backend('skipped', null)]);
+  assert.equal(run.deployed, false);
+  assert.equal(run.failed, false);
+});
+
 test('a deploy that failed before starting is not a failure', () => {
   assert.equal(classifyRun([backend('failure', 'failure')]).failed, false);
 });
