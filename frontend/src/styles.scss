@@ -1,13 +1,13 @@
 /*
  * Global styles: the app's small design system (BILLIAMVT-49, decision record 0006).
  *
- * Tokens (custom properties) for colour, spacing, type and shape, and shared styles for the
+ * Tokens (custom properties) for color, spacing, type and shape, and shared styles for the
  * elements every page uses: buttons, links styled as buttons, form fields, notices and cards.
  * Components use these instead of their own values, and add only their layout.
  */
 
-// Theme colours: "Teal and sand" (chosen Nov 15, decision record 0006). Teal is the app's one
-// signature colour (buttons, links, today, a done tick); the backgrounds are warm and paper-like;
+// Theme colors: "Teal and sand" (chosen Nov 15, decision record 0006). Teal is the app's one
+// signature color (buttons, links, today, a done tick); the backgrounds are warm and paper-like;
 // red is a warm brick, kept for Overdue and deleting. The app follows the device's light or dark
 // setting (BILLIAMVT-45). Every pair meets WCAG AA: text 4.5:1, borders, icons and the done tick
 // 3:1, and button text 4.5:1 against its button; axe checks it in the e2e tests.
@@ -309,7 +309,7 @@ label {
 
 // A week-view row being dragged (BILLIAMVT-28). The CDK moves a copy to the end of the page, so
 // it's styled here rather than in the week view. Lifted like a card, as iPhone lists do: a solid
-// background, a teal outline (the focus colour, which is the brighter teal in dark mode), a strong
+// background, a teal outline (the focus color, which is the brighter teal in dark mode), a strong
 // shadow and a slight scale-up.
 .cdk-drag-preview.occurrence {
   box-sizing: border-box;
