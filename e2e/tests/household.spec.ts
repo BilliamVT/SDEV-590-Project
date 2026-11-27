@@ -96,6 +96,38 @@ test('a task is assigned to a member, and one day to someone else', async ({ pag
   await sam.context().close();
 });
 
+test('Mine shows only my days and Anyone\'s, and is remembered (BILLIAMVT-66)', async ({ page, browser }) => {
+  const sam = await patAndSam(page, browser);
+  await page.getByRole('link', { name: 'Housework Scheduler' }).click();
+  await addTask(page, 'Vacuum', 'Every day');
+  await page.getByRole('link', { name: 'Add a task' }).click();
+  const taskName = page.getByLabel('Task', { exact: true });
+  await formReady(taskName);
+  await taskName.fill('Dishes');
+  await page.getByLabel('Repeats').selectOption({ label: 'Every day' });
+  await page.getByLabel('Assigned to').selectOption({ label: 'Sam' });
+  await page.getByRole('button', { name: 'Save task' }).click();
+  await expect(today(page).getByText('Dishes')).toBeVisible();
+
+  // Mine hides Sam's Dishes and keeps Anyone's Vacuum
+  await page.getByRole('button', { name: 'Mine' }).click();
+  await expect(page.getByRole('button', { name: 'Mine' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(today(page).getByText('Dishes')).toBeHidden();
+  await expect(today(page).getByText('Vacuum')).toBeVisible();
+
+  // Remembered after a reload on this phone; Sam's phone still shows everyone
+  await page.reload();
+  await expect(today(page).getByText('Vacuum')).toBeVisible();
+  await expect(today(page).getByText('Dishes')).toBeHidden();
+  await sam.reload();
+  await expect(sam.getByRole('button', { name: 'Everyone' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(today(sam).getByText('Dishes')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Everyone' }).click();
+  await expect(today(page).getByText('Dishes')).toBeVisible();
+  await sam.context().close();
+});
+
 /**
  * Two phones on the same week (BILLIAMVT-55, decision record 0007): coming back to the app shows
  * what changed, and acting on something that already changed reloads the week and says so,

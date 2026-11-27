@@ -9,6 +9,17 @@
         <button type="button" (click)="next()" [disabled]="loading() || atLimit()">Next ›</button>
       </nav>
     </div>
+    @if (showMineFilter()) {
+      <!-- Everyone / Mine (BILLIAMVT-66): a two-button switch; the pressed one is the current view -->
+      <div class="week-filter" role="group" aria-label="Show">
+        <button type="button" [class.primary]="filter() === 'everyone'" [attr.aria-pressed]="filter() === 'everyone'" (click)="setFilter('everyone')">
+          Everyone
+        </button>
+        <button type="button" [class.primary]="filter() === 'mine'" [attr.aria-pressed]="filter() === 'mine'" (click)="setFilter('mine')">
+          Mine
+        </button>
+      </div>
+    }
     @if (atLimit()) {
       <p class="hint">You can plan up to 2 years ahead.</p>
     }
@@ -53,7 +64,7 @@
               }
             </h3>
             @if (day.occurrences.length === 0) {
-              <p class="empty">Nothing scheduled</p>
+              <p class="empty">{{ day.hidden > 0 ? 'Nothing for you' : 'Nothing scheduled' }}</p>
             } @else {
               <ul>
                 @for (occurrence of day.occurrences; track occurrence.id) {
