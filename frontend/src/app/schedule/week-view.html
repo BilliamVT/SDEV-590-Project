@@ -1,14 +1,24 @@
 @if (!noHousehold()) {
   <section class="week" aria-labelledby="week-title">
+    <!-- The week between ‹ and ›, like iPhone Calendar (BILLIAMVT-58) -->
     <div class="week-header">
+      <button type="button" class="week-arrow" aria-label="Previous week" (click)="previous()">
+        <span aria-hidden="true">‹</span>
+      </button>
       <!-- Focusable from code only: where focus goes after the week is reloaded under a stale action -->
       <h2 id="week-title" tabindex="-1">{{ title() }}</h2>
-      <nav class="week-nav" aria-label="Choose a week">
-        <button type="button" (click)="previous()" [disabled]="loading()">‹ Previous</button>
-        <button type="button" (click)="today()" [disabled]="loading() || isThisWeek()">This week</button>
-        <button type="button" (click)="next()" [disabled]="loading() || atLimit()">Next ›</button>
-      </nav>
+      <button type="button" class="week-arrow" aria-label="Next week" (click)="next()" [disabled]="atLimit()">
+        <span aria-hidden="true">›</span>
+      </button>
     </div>
+    <!-- Under the title: "This week", or a link back to it from any other week. Always the same height, so the page doesn't shift -->
+    <p class="back-to-week">
+      @if (isThisWeek()) {
+        <span class="this-week">This week</span>
+      } @else {
+        <button type="button" class="quiet" (click)="backToThisWeek()">Back to this week</button>
+      }
+    </p>
     @if (showMineFilter()) {
       <!-- Everyone / Mine (BILLIAMVT-66): a two-button switch; the pressed one is the current view -->
       <div class="week-filter" role="group" aria-label="Show">
@@ -37,7 +47,7 @@
       <p class="hint">Loading your week… The server sleeps when it isn't in use, so this can take up to a minute.</p>
     } @else {
       <!-- Each day is a drop target for drag-and-drop (BILLIAMVT-28), including empty days -->
-      <ol class="days" [class.refreshing]="loading()" [class.dragging]="dragging()" [class.drag-enabled]="dragEnabled()" cdkDropListGroup>
+      <ol class="days" [class.refreshing]="dimmed()" [attr.aria-busy]="loading()" [class.dragging]="dragging()" [class.drag-enabled]="dragEnabled()" cdkDropListGroup>
         @for (day of days(); track day.date) {
           <li
             class="day"

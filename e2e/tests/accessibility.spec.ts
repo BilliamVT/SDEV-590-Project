@@ -31,7 +31,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await register(page, 'Pat');
       await expectAccessible(page, 'Set up your household');
       await page.getByRole('button', { name: 'Create household' }).click();
-      await expect(page.getByRole('button', { name: 'This week' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Previous week' })).toBeVisible();
 
       // The home page with something in every state: pending, done, a one-off item, the backlog
       await addTask(page, 'Vacuum', 'Every day');
@@ -42,6 +42,13 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await today(page).getByRole('button', { name: 'Mark Vacuum done' }).click();
       await expect(today(page).getByText('Done by Pat')).toBeVisible();
       await expectAccessible(page, 'Home');
+
+      // Another week, with Back to this week showing (BILLIAMVT-58)
+      await page.getByRole('button', { name: 'Next week' }).click();
+      await expect(page.getByRole('button', { name: 'Back to this week' })).toBeVisible();
+      await expectAccessible(page, 'Home, next week');
+      await page.getByRole('button', { name: 'Back to this week' }).click();
+      await expect(today(page).getByText('Done by Pat')).toBeVisible();
 
       // A ⋯ menu open, then the action sheet
       await openMenu(today(page), 'Vacuum');

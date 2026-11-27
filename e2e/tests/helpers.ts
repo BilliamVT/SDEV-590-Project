@@ -41,7 +41,7 @@ export async function logIn(page: Page, email: string): Promise<void> {
 export async function signUpWithHousehold(page: Page, name: string): Promise<void> {
   await register(page, name);
   await createHousehold(page, `${name}'s home`);
-  await expect(page.getByRole('button', { name: 'This week' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Previous week' })).toBeVisible();
 }
 
 /**
@@ -82,7 +82,7 @@ export function day(page: Page, name: string) {
 
 /** Waits until the week view has finished loading the week it shows. */
 export async function weekLoaded(page: Page): Promise<void> {
-  await expect(page.locator('.days')).not.toHaveClass(/refreshing/);
+  await expect(page.locator('.days')).toHaveAttribute('aria-busy', 'false');
 }
 
 /** The household's invite code, from Settings (BILLIAMVT-49). Leaves the page on Settings. */

@@ -2,6 +2,21 @@ import { expect, test } from '@playwright/test';
 
 import { addBacklogItem, addTask, backlog, backlogItem, confirmSheet, day, openMenu, signUpWithHousehold, today, weekLoaded } from './helpers';
 
+test('the week moves with ‹ and ›, and Back to this week shows only on another week (BILLIAMVT-58)', async ({ page }) => {
+  await signUpWithHousehold(page, 'Pat');
+  const title = page.locator('#week-title');
+  const thisWeek = await title.textContent();
+  await expect(page.getByRole('button', { name: 'Back to this week' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Next week' }).click();
+  await weekLoaded(page);
+  await expect(title).not.toHaveText(thisWeek!);
+  await page.getByRole('button', { name: 'Back to this week' }).click();
+  await expect(title).toHaveText(thisWeek!);
+  await expect(title).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Back to this week' })).toHaveCount(0);
+});
+
 test('a new daily task shows today, and can be marked done and undone', async ({ page }) => {
   await signUpWithHousehold(page, 'Pat');
 
@@ -194,7 +209,7 @@ test('a backlog item done on an earlier day shows on that day as done', async ({
   await expect(backlog(page).getByText('Nothing in the backlog.')).toBeVisible();
 
   if (lastWeek) {
-    await page.getByRole('button', { name: /^‹ Previous/ }).click();
+    await page.getByRole('button', { name: 'Previous week' }).click();
     await weekLoaded(page);
   }
   await expect(day(page, name).getByText('Clean gutters')).toBeVisible();

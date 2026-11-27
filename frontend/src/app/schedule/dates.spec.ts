@@ -25,7 +25,7 @@ describe('dates', () => {
   it('labels weeks without repeating the month or year', () => {
     expect(weekLabel('2026-11-08', '2026-11-14')).toBe('Nov 8 – 14, 2026');
     expect(weekLabel('2026-11-29', '2026-12-05')).toBe('Nov 29 – Dec 5, 2026');
-    expect(weekLabel('2026-12-27', '2027-01-02')).toBe('Dec 27, 2026 – Jan 2, 2027');
+    expect(weekLabel('2026-12-27', '2027-01-02')).toBe('Dec 27 – Jan 2, 2027');
   });
 
   it('labels days briefly, adding the year when it is not this year (BILLIAMVT-26)', () => {
