@@ -1,8 +1,9 @@
 -- Share of scheduled tasks completed, by household and week (BILLIAMVT-31).
 --
 -- Read-only: it runs in a read-only transaction, so Postgres refuses any write. Run it against production with
--- Render's external database URL (Render → the Postgres instance → Connect → External), e.g.
---   psql "<external database URL>" -f docs/metrics/completion-share.sql
+-- the Neon connection string (Neon → the project → Connect → the plain connection string starting
+-- postgresql://, not the JDBC one psql can't read; production's database is on Neon, not Render), e.g.
+--   psql "<Neon connection string>" -f docs/metrics/completion-share.sql
 -- and record the household's weekly row in the "Capstone Sprint Metrics" sheet.
 --
 -- What counts:
