@@ -110,19 +110,16 @@ jobs:
           echo "::error::Health check at $HEALTH_URL did not report UP"
           exit 1
 
-  frontend:
-    name: Deploy frontend to GitHub Pages
+  # The front end is built and uploaded in one job and published in the next, as in GitHub's
+  # own Pages template. Publishing straight after the upload, in the same job, sometimes failed
+  # with "No artifacts named github-pages were found" (BILLIAMVT-73): the upload had worked, but
+  # GitHub hadn't registered it yet.
+  frontend-build:
+    name: Build frontend for GitHub Pages
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
     defaults:
       run:
         working-directory: frontend
@@ -147,10 +144,24 @@ jobs:
           npx ng build --base-href /SDEV-590-Project/
           cp dist/frontend/browser/index.html dist/frontend/browser/404.html
 
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: frontend/dist/frontend/browser
 
+  # Keeps its name and its step's name: the delivery metrics count a deploy by them
+  # (.github/scripts/delivery-metrics.mjs)
+  frontend:
+    name: Deploy frontend to GitHub Pages
+    needs: frontend-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
       - name: Publish to GitHub Pages
         id: pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

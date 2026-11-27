@@ -41,7 +41,7 @@ test('a member can log in, see their week and household, and log out', async ({ 
 
   // Home: the welcome and the week, which needs the household
   await expect(page.getByText(`Welcome, ${name}.`)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'This week' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Previous week' })).toBeVisible();
   await expect(page.locator('.day.today')).toBeVisible();
 
   // Settings: the account's household
