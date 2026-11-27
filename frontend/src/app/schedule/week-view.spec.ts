@@ -656,6 +656,85 @@ describe('WeekView', () => {
     });
   });
 
+  describe('Everyone / Mine (BILLIAMVT-66)', () => {
+    beforeEach(() => localStorage.removeItem('housework.weekFilter'));
+    afterEach(() => {
+      localStorage.removeItem('housework.weekFilter');
+      vi.restoreAllMocks();
+    });
+    const names = (element: HTMLElement) => [...element.querySelectorAll('.occurrence .name')].map((n) => n.textContent);
+    const pressed = (element: HTMLElement) =>
+      [...element.querySelectorAll('.week-filter button')].map((b) => `${b.textContent?.trim()}:${b.getAttribute('aria-pressed')}`);
+    // Pat (me) and Sam; Wednesday has one of each, Anyone's, and one Pat did though it was Sam's
+    const week = (from: string, to: string) =>
+      of(
+        schedule(from, to, [
+          occurrence(1, 'Vacuum', '2026-11-11', { assigneeId: ME, assigneeName: 'Pat Lee' }),
+          occurrence(2, 'Dishes', '2026-11-11', { assigneeId: 2, assigneeName: 'Sam Ray' }),
+          occurrence(3, 'Mop', '2026-11-11'),
+          occurrence(4, 'Laundry', '2026-11-11', {
+            assigneeId: 2,
+            assigneeName: 'Sam Ray',
+            status: 'DONE',
+            completedById: ME,
+            completedByName: 'Pat',
+          }),
+          occurrence(5, 'Bins', '2026-11-12', { assigneeId: 2, assigneeName: 'Sam Ray' }),
+        ]),
+      );
+
+    it('shows everyone by default, with the switch on Everyone', async () => {
+      const { element } = await render(week);
+      expect(pressed(element)).toEqual(['Everyone:true', 'Mine:false']);
+      expect(names(element)).toEqual(['Vacuum', 'Dishes', 'Mop', 'Laundry', 'Bins']);
+    });
+
+    it("Mine shows my days, Anyone's, and ones I did; a day with only others' says so", async () => {
+      const { element, click } = await render(week);
+      await click('Mine');
+
+      expect(pressed(element)).toEqual(['Everyone:false', 'Mine:true']);
+      expect(names(element)).toEqual(['Vacuum', 'Mop', 'Laundry']);
+      const thursday = element.querySelector('.day[data-date="2026-11-12"] .empty');
+      expect(thursday?.textContent).toBe('Nothing for you');
+      // A day with nothing at all still says so
+      expect(element.querySelector('.day[data-date="2026-11-13"] .empty')?.textContent).toBe('Nothing scheduled');
+
+      await click('Everyone');
+      expect(names(element)).toHaveLength(5);
+    });
+
+    it('is remembered on this phone', async () => {
+      localStorage.setItem('housework.weekFilter', 'mine');
+      const { element } = await render(week);
+      expect(pressed(element)).toEqual(['Everyone:false', 'Mine:true']);
+      expect(names(element)).toEqual(['Vacuum', 'Mop', 'Laundry']);
+    });
+
+    it('still works when storage is unavailable', async () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      const { element, click } = await render(week);
+      expect(pressed(element)).toEqual(['Everyone:true', 'Mine:false']);
+      await click('Mine');
+      expect(names(element)).toEqual(['Vacuum', 'Mop', 'Laundry']);
+    });
+
+    it('is hidden when no one else is in the household, and shows everything', async () => {
+      localStorage.setItem('housework.weekFilter', 'mine');
+      const { element, fixture } = await render(week);
+      TestBed.inject(HouseholdService).members.set([MEMBERS[0]]);
+      await fixture.whenStable();
+
+      expect(element.querySelector('.week-filter')).toBeNull();
+      expect(names(element)).toHaveLength(5);
+    });
+  });
+
   describe('assigning (BILLIAMVT-64)', () => {
     const assignSheet = (element: HTMLElement) => element.querySelectorAll<HTMLDialogElement>('dialog.sheet')[2];
     const choices = (element: HTMLElement) =>

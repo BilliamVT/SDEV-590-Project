@@ -22,8 +22,17 @@ interface Day {
   date: string;
   label: string;
   isToday: boolean;
+  /** The day's rows, after the Everyone / Mine filter */
   occurrences: ScheduledOccurrence[];
+  /** Rows the Mine filter hides, so an empty day can say "Nothing for you" instead of "Nothing scheduled" */
+  hidden: number;
 }
+
+/** Everyone, or only my days (BILLIAMVT-66) */
+export type WeekFilter = 'everyone' | 'mine';
+
+/** Where this phone remembers the filter; per device, like a preference */
+const FILTER_KEY = 'housework.weekFilter';
 
 /** The household's week, Sunday to Saturday (BILLIAMVT-39). */
 @Component({
@@ -117,16 +126,32 @@ export class WeekView {
 
   protected readonly days = computed<Day[]>(() => {
     const schedule = this.schedule();
+    const mineOnly = this.showMineFilter() && this.filter() === 'mine';
+    const me = this.myId();
     return Array.from({ length: 7 }, (_, i) => {
       const date = addDays(this.weekStart(), i);
-      return {
-        date,
-        label: dayLabel(date),
-        isToday: date === schedule?.today,
-        occurrences: schedule?.occurrences.filter((o) => o.date === date) ?? [],
-      };
+      const all = schedule?.occurrences.filter((o) => o.date === date) ?? [];
+      const occurrences = mineOnly ? all.filter((o) => isMine(o, me)) : all;
+      return { date, label: dayLabel(date), isToday: date === schedule?.today, occurrences, hidden: all.length - occurrences.length };
     });
   });
+
+  /**
+   * Everyone / Mine (BILLIAMVT-66), remembered on this phone. Shown only when the household has
+   * someone else in it: on your own, every day is yours.
+   */
+  protected readonly filter = signal<WeekFilter>(readFilter());
+  protected readonly showMineFilter = computed(() => (this.members()?.length ?? 0) > 1);
+
+  protected setFilter(filter: WeekFilter): void {
+    this.filter.set(filter);
+    this.menuOpen.set(null);
+    try {
+      localStorage.setItem(FILTER_KEY, filter);
+    } catch {
+      // Storage can be unavailable (private browsing); the filter still works until the page reloads
+    }
+  }
 
   /** The API can't show past lastViewableDate, so stop at the week that contains it. */
   protected readonly atLimit = computed(() => {
@@ -769,3 +794,19 @@ const STATUS_WORDS: Record<OccurrenceStatus, string> = {
   SKIPPED: 'skipped',
   PENDING: 'marked not done',
 };
+
+/**
+ * A day is mine when it's assigned to me or to Anyone (still mine to pick up), or I'm the one who
+ * did or skipped it (BILLIAMVT-66).
+ */
+function isMine(occurrence: ScheduledOccurrence, me: number | null): boolean {
+  return occurrence.assigneeId === null || occurrence.assigneeId === me || (me !== null && occurrence.completedById === me);
+}
+
+function readFilter(): WeekFilter {
+  try {
+    return localStorage.getItem(FILTER_KEY) === 'mine' ? 'mine' : 'everyone';
+  } catch {
+    return 'everyone';
+  }
+}
