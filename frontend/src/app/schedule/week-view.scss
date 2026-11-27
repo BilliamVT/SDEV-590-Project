@@ -2,22 +2,53 @@
   margin: var(--space-4) 0 var(--space-5);
 }
 
+// The week's title centered between round ‹ and › buttons (BILLIAMVT-58). A long title, such as
+// one across two years, wraps within the middle and never runs under the buttons.
 .week-header {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: var(--touch) minmax(0, 1fr) var(--touch);
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
 
   h2 {
     margin: 0;
+    text-align: center;
+    font-size: var(--text-xl);
+
+    // Smaller on the narrowest phones (iPhone SE, 320 px), so even the longest week, such as
+    // "Dec 27 – Jan 2, 2027", stays on one line between the arrows
+    @media (max-width: 374px) {
+      font-size: 1.0625rem;
+    }
   }
 }
 
-.week-nav {
+.week-arrow {
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+// "This week" on this week, and a link back to it from any other, so there's never a greyed-out
+// button. The row is always the same height, so the switch and the days below don't jump.
+.back-to-week {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch);
+  margin: var(--space-1) 0;
+
+  button {
+    min-height: var(--touch);
+  }
+}
+
+.this-week {
+  color: var(--color-text-muted);
+  font-weight: 600;
 }
 
 // Everyone / Mine (BILLIAMVT-66): two joined, equal buttons across the full width, the selected one filled (.primary), like an iPhone segmented control

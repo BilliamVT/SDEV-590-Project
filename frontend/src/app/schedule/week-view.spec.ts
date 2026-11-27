@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { NEVER, Observable, of, throwError } from 'rxjs';
+import { NEVER, Observable, Subject, of, throwError } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
 import { BacklogService } from '../backlog/backlog.service';
@@ -155,38 +155,94 @@ describe('WeekView', () => {
     expect(schedules.between).toHaveBeenLastCalledWith('2026-11-15', '2026-11-21');
     expect(element.querySelector('h2')?.textContent).toBe('Nov 15 – 21, 2026');
     expect(element.querySelector('.day.today h3')?.textContent).toContain('Sunday, Nov 15');
-    expect(button('This week').disabled).toBe(true);
+    expect(button('Back to this week')).toBeUndefined();
   });
 
-  it('moves between weeks', async () => {
+  it('moves between weeks with ‹ and ›, and offers Back to this week only away from it (BILLIAMVT-58)', async () => {
     const { schedules, element, click, button } = await render();
-    expect(button('This week').disabled).toBe(true);
+    // The arrows are named for screen readers; the ‹ › themselves are hidden from them
+    expect(button('Previous week').querySelector('[aria-hidden="true"]')?.textContent).toBe('‹');
+    expect(button('Back to this week')).toBeUndefined();
+    expect(element.querySelector('.back-to-week')?.textContent?.trim()).toBe('This week');
 
-    await click('Next ›');
+    await click('Next week');
     expect(schedules.between).toHaveBeenLastCalledWith('2026-11-15', '2026-11-21');
     expect(element.querySelector('h2')?.textContent).toBe('Nov 15 – 21, 2026');
-    expect(button('This week').disabled).toBe(false);
+    expect(button('Back to this week')).toBeDefined();
+    expect(element.querySelector('.this-week')).toBeNull();
 
-    await click('‹ Previous');
-    await click('‹ Previous');
+    await click('Previous week');
+    await click('Previous week');
     expect(schedules.between).toHaveBeenLastCalledWith('2026-11-01', '2026-11-07');
 
-    await click('This week');
+    await click('Back to this week');
     expect(schedules.between).toHaveBeenLastCalledWith('2026-11-08', '2026-11-14');
+    expect(button('Back to this week')).toBeUndefined();
+    // The link is gone, so focus goes to the week's title
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(document.activeElement?.id).toBe('week-title');
+  });
+
+  it('keeps only the latest week when ‹ or › is tapped again before a week arrives (BILLIAMVT-58)', async () => {
+    const replies = new Map<string, Subject<Schedule>>();
+    const { element, click, button, fixture } = await render((from) => {
+      const reply = new Subject<Schedule>();
+      replies.set(from, reply);
+      return reply;
+    });
+    replies.get('2026-11-08')!.next(schedule('2026-11-08', '2026-11-14', [occurrence(1, 'This week', '2026-11-11')]));
+
+    // The arrows stay usable while a week loads
+    await click('Next week');
+    expect(button('Next week').disabled).toBe(false);
+    await click('Next week');
+    // The second week answers first, then the first one late: the late reply is dropped
+    replies.get('2026-11-22')!.next(schedule('2026-11-22', '2026-11-28', [occurrence(3, 'Two ahead', '2026-11-23')]));
+    replies.get('2026-11-15')!.next(schedule('2026-11-15', '2026-11-21', [occurrence(2, 'One ahead', '2026-11-16')]));
+    await fixture.whenStable();
+    expect(element.querySelector('h2')?.textContent).toBe('Nov 22 – 28, 2026');
+    expect([...element.querySelectorAll('.occurrence .name')].map((n) => n.textContent)).toEqual(['Two ahead']);
+
+    await click('Back to this week');
+    replies.get('2026-11-08')!.next(schedule('2026-11-08', '2026-11-14', [occurrence(1, 'This week', '2026-11-11')]));
+    await fixture.whenStable();
+
+    expect(element.querySelector('h2')?.textContent).toBe('Nov 8 – 14, 2026');
+    expect([...element.querySelectorAll('.occurrence .name')].map((n) => n.textContent)).toEqual(['This week']);
+  });
+
+  it('dims the days only when a week is slow to load, and says it is busy meanwhile', async () => {
+    const pending = new Subject<Schedule>();
+    let calls = 0;
+    const { element, click, fixture } = await render((from, to) => (calls++ === 0 ? of(schedule(from, to)) : pending));
+    const days = () => element.querySelector('.days')!;
+
+    await click('Next week');
+    expect(days().getAttribute('aria-busy')).toBe('true');
+    expect(days().classList).not.toContain('refreshing');
+
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await fixture.whenStable();
+    expect(days().classList).toContain('refreshing');
+
+    pending.next(schedule('2026-11-15', '2026-11-21'));
+    await fixture.whenStable();
+    expect(days().getAttribute('aria-busy')).toBe('false');
+    expect(days().classList).not.toContain('refreshing');
   });
 
   it('stops at the 2-year limit and says why', async () => {
     // The last week whose end is still on or before the limit
     const { element, button } = await render((from, to) => of(schedule(from, to, [], '2026-11-20')));
 
-    expect(button('Next ›').disabled).toBe(true);
+    expect(button('Next week').disabled).toBe(true);
     expect(element.textContent).toContain('You can plan up to 2 years ahead.');
   });
 
   it('allows the next week while it ends on or before the limit', async () => {
     const { element, button } = await render((from, to) => of(schedule(from, to, [], '2026-11-21')));
 
-    expect(button('Next ›').disabled).toBe(false);
+    expect(button('Next week').disabled).toBe(false);
     expect(element.textContent).not.toContain('2 years ahead');
   });
 
@@ -638,7 +694,7 @@ describe('WeekView', () => {
       await click('Mark Vacuum done, Wednesday, Nov 11');
       expect(notice(element)).toBeDefined();
 
-      await click('‹ Previous');
+      await click('Previous week');
 
       expect(notice(element)).toBeUndefined();
     });

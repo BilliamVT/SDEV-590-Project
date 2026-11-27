@@ -22,7 +22,7 @@ async function householdAcrossZones(browser: Browser, householdZone: string, sam
   const sam = await (await browser.newContext({ timezoneId: samZone })).newPage();
   await register(sam, 'Sam');
   await joinHouseholdNamed(sam, code, 'Maple Street');
-  await expect(sam.getByRole('button', { name: 'This week' })).toBeAttached();
+  await expect(sam.getByRole('button', { name: 'Previous week' })).toBeAttached();
   return sam;
 }
 

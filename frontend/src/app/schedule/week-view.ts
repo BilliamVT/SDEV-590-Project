@@ -1,7 +1,7 @@
 import { CdkDrag, CdkDragDrop, CdkDragMove, CdkDragStart, CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, ElementRef, computed, inject, output, signal } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
 import { errorMessage } from '../auth/error-message';
@@ -30,6 +30,9 @@ interface Day {
 
 /** Everyone, or only my days (BILLIAMVT-66) */
 export type WeekFilter = 'everyone' | 'mine';
+
+/** How long a week can take to load before the days dim, so quick changes don't flicker */
+const DIM_AFTER_MS = 300;
 
 /** Where this phone remembers the filter; per device, like a preference */
 const FILTER_KEY = 'housework.weekFilter';
@@ -71,6 +74,10 @@ export class WeekView {
   protected readonly title = computed(() => weekLabel(this.weekStart(), this.weekEnd()));
   protected readonly schedule = signal<Schedule | null>(null);
   protected readonly loading = signal(true);
+  /** The days are dimmed while a week loads, but only once it has taken a moment (BILLIAMVT-58) */
+  protected readonly dimmed = signal(false);
+  private dimTimer?: ReturnType<typeof setTimeout>;
+  private loadRequest?: Subscription;
   protected readonly error = signal<string | null>(null);
   /** The user has no household yet; the household card asks them to set one up. */
   protected readonly noHousehold = signal(false);
@@ -263,8 +270,10 @@ export class WeekView {
     }
   }
 
-  protected today(): void {
+  /** Back to this week (BILLIAMVT-58); the link goes away, so focus goes to the week's title. */
+  protected backToThisWeek(): void {
     this.go(this.thisWeek());
+    focusLater(this.host, '#week-title');
   }
 
   protected minutes(occurrence: ScheduledOccurrence): string | null {
@@ -749,9 +758,15 @@ export class WeekView {
 
   /** {@code after} runs once the week has loaded, e.g. to show a notice about what changed. */
   private load(after?: (schedule: Schedule) => void): void {
+    // Only the latest week counts: tapping ‹ or › again drops the reply for the week before it,
+    // so the arrows don't have to be disabled while a week loads (BILLIAMVT-58)
+    this.loadRequest?.unsubscribe();
+    clearTimeout(this.dimTimer);
     this.loading.set(true);
     this.error.set(null);
-    this.schedules.between(this.weekStart(), this.weekEnd()).subscribe({
+    // Dim the days only if the week is slow to come, so a quick change doesn't flicker
+    this.dimTimer = setTimeout(() => this.dimmed.set(this.loading()), DIM_AFTER_MS);
+    this.loadRequest = this.schedules.between(this.weekStart(), this.weekEnd()).subscribe({
       next: (schedule) => {
         const householdWeek = startOfWeek(schedule.today);
         if (householdWeek !== this.thisWeek()) {
@@ -764,15 +779,21 @@ export class WeekView {
         }
         this.schedule.set(schedule);
         this.noHousehold.set(false);
-        this.loading.set(false);
+        this.loaded();
         after?.(schedule);
       },
       error: (err: unknown) => {
         this.noHousehold.set(err instanceof HttpErrorResponse && err.status === 404);
         this.error.set(errorMessage(err));
-        this.loading.set(false);
+        this.loaded();
       },
     });
+  }
+
+  private loaded(): void {
+    clearTimeout(this.dimTimer);
+    this.loading.set(false);
+    this.dimmed.set(false);
   }
 }
 

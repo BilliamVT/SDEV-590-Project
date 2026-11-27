@@ -33,10 +33,11 @@ export function startOfWeek(iso: string): string {
 export function weekLabel(from: string, to: string): string {
   const start = fromIsoDate(from);
   const end = fromIsoDate(to);
-  const sameYear = start.getFullYear() === end.getFullYear();
-  const sameMonth = sameYear && start.getMonth() === end.getMonth();
+  const sameMonth = start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth();
   const monthDay = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const startText = sameYear ? monthDay(start) : `${monthDay(start)}, ${start.getFullYear()}`;
+  // The year is given once, at the end, even across New Year: "Dec 27 – Jan 2, 2027" fits on one
+  // line on a phone, and a week can only run from late December into January (BILLIAMVT-58)
+  const startText = monthDay(start);
   // "Nov 8 – 14, 2026": the month isn't repeated within one month
   const endText = `${sameMonth ? end.getDate() : monthDay(end)}, ${end.getFullYear()}`;
   return `${startText} – ${endText}`;
