@@ -31,6 +31,7 @@ describe('NewTask (editing)', () => {
     estimatedMinutes: 5,
     active: true,
     lastDone: null,
+    assigneeId: null,
   };
 
   async function render(task: Task = existing) {
@@ -43,7 +44,7 @@ describe('NewTask (editing)', () => {
       providers: [
         provideRouter([]),
         { provide: TaskService, useValue: tasks },
-        { provide: HouseholdService, useValue: { timeZoneKnown: () => true, today: () => toIsoDate(new Date()) } },
+        { provide: HouseholdService, useValue: { timeZoneKnown: () => true, today: () => toIsoDate(new Date()), members: () => [] } },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: '7' }) } } },
       ],
     }).compileComponents();
@@ -99,6 +100,7 @@ describe('NewTask (editing)', () => {
       interval: 4,
       startsOn: '2026-11-02',
       estimatedMinutes: 5,
+      assigneeId: null,
     });
     expect(router.navigate).toHaveBeenCalledWith(['/tasks']);
     // A toast, with no "Add another" after an edit (BILLIAMVT-57)

@@ -26,6 +26,7 @@ const savedTask = (request: CreateTaskRequest): Task => ({
   estimatedMinutes: request.estimatedMinutes ?? null,
   active: true,
   lastDone: null,
+  assigneeId: null,
 });
 
 describe('NewTask', () => {
@@ -37,7 +38,7 @@ describe('NewTask', () => {
   afterEach(() => vi.useRealTimers());
 
   /** The household's time zone already known, and its today the same as the device's */
-  const knownHousehold = () => ({ timeZoneKnown: () => true, today: () => toIsoDate(new Date()), load: vi.fn() });
+  const knownHousehold = () => ({ timeZoneKnown: () => true, today: () => toIsoDate(new Date()), load: vi.fn(), members: () => [] });
 
   async function render(
     create: (request: CreateTaskRequest) => Observable<Task> = (r) => of(savedTask(r)),
@@ -82,6 +83,46 @@ describe('NewTask', () => {
     };
     return { tasks, backlog, router, fixture, element, set, submit, click, toggle };
   }
+
+  describe('assigning (BILLIAMVT-64)', () => {
+    const withMembers = () => ({
+      ...knownHousehold(),
+      members: () => [
+        { id: 1, displayName: 'Pat Lee' },
+        { id: 2, displayName: 'Sam Ray' },
+      ],
+    });
+    const pickAssignee = async (element: HTMLElement, fixture: { whenStable: () => Promise<unknown> }, index: number) => {
+      const select = element.querySelector<HTMLSelectElement>('#task-assignee')!;
+      select.selectedIndex = index;
+      select.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+    };
+
+    it("offers Anyone and the household's members, and sends the one picked", async () => {
+      const { tasks, element, fixture, set, submit } = await render(undefined, withMembers());
+      const options = [...element.querySelectorAll('#task-assignee option')].map((o) => o.textContent?.trim());
+      expect(options).toEqual(['Anyone', 'Pat Lee', 'Sam Ray']);
+
+      await set('task-name', 'Vacuum');
+      await set('task-frequency', 'DAILY');
+      await pickAssignee(element, fixture, 2);
+      await submit();
+
+      expect(tasks.create).toHaveBeenCalledWith({ name: 'Vacuum', frequency: 'DAILY', assigneeId: 2 });
+    });
+
+    it('assigns a one-time task too', async () => {
+      const { backlog, element, fixture, set, submit } = await render(undefined, withMembers());
+      await set('task-name', 'Vacuum');
+      await set('task-frequency', 'ONCE');
+      await set('task-start', '2026-11-08');
+      await pickAssignee(element, fixture, 1);
+      await submit();
+
+      expect(backlog.create).toHaveBeenCalledWith({ name: 'Vacuum', date: '2026-11-08', assigneeId: 1 });
+    });
+  });
 
   it('creates a weekly task with only the fields it needs, then shows the week', async () => {
     const { tasks, router, set, submit, toggle } = await render();
@@ -220,7 +261,7 @@ describe('NewTask', () => {
         arrives.subscribe(() => zone.set('a day ahead'));
         return arrives;
       });
-      return { timeZoneKnown: () => zone() !== null, today: () => (zone() ? '2026-11-05' : '2026-11-04'), load };
+      return { timeZoneKnown: () => zone() !== null, today: () => (zone() ? '2026-11-05' : '2026-11-04'), load, members: () => [] };
     }
 
     it("loads the household, then starts on its today and doesn't allow earlier", async () => {

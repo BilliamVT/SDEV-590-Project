@@ -3,6 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 
+import { signal } from '@angular/core';
+
+import { Member } from '../household/household.models';
+import { HouseholdService } from '../household/household.service';
 import { Task } from './task.models';
 import { TaskList } from './task-list';
 import { TaskService } from './task.service';
@@ -20,6 +24,7 @@ const task = (id: number, name: string, extra: Partial<Task> = {}): Task => ({
   estimatedMinutes: null,
   active: true,
   lastDone: null,
+  assigneeId: null,
   ...extra,
 });
 
@@ -35,9 +40,21 @@ describe('TaskList', () => {
       resume: vi.fn((id: number) => of({ ...tasks.find((t) => t.id === id)!, active: true })),
       delete: vi.fn(() => of(undefined)),
     };
+    // Members aren't known yet, as when Your tasks is opened straight from a link
+    const members = signal<Member[] | null>(null);
+    const households = {
+      members,
+      load: vi.fn(() => {
+        members.set([
+          { id: 1, displayName: 'Pat Lee' },
+          { id: 2, displayName: 'Sam Ray' },
+        ]);
+        return of(null);
+      }),
+    };
     await TestBed.configureTestingModule({
       imports: [TaskList],
-      providers: [provideRouter([]), { provide: TaskService, useValue: service }],
+      providers: [provideRouter([]), { provide: TaskService, useValue: service }, { provide: HouseholdService, useValue: households }],
     }).compileComponents();
     const fixture = TestBed.createComponent(TaskList);
     await fixture.whenStable();
@@ -53,6 +70,14 @@ describe('TaskList', () => {
     };
     return { service, fixture, element, row, click, sheetButton };
   }
+
+  it("shows who each task is assigned to, by first name, and nothing for Anyone (BILLIAMVT-64)", async () => {
+    const { row } = await render([task(1, 'Dishes', { assigneeId: 2 }), task(2, 'Vacuum')]);
+
+    expect(row('Dishes').querySelector('.assignee')?.textContent).toBe('Assigned to Sam');
+    expect(row('Dishes').querySelector('.assignee .visually-hidden')?.textContent).toBe('Assigned to ');
+    expect(row('Vacuum').querySelector('.assignee')).toBeNull();
+  });
 
   it('lists the tasks with their schedule, minutes and an edit link', async () => {
     const { row } = await render([task(1, 'Dishes', { estimatedMinutes: 15 }), task(2, 'Vacuum', { schedule: 'Every week on Saturday' })]);

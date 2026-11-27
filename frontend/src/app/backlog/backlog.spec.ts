@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
 
@@ -9,8 +10,12 @@ import { BacklogItem, CreateItemRequest } from './backlog.models';
 import { BacklogService } from './backlog.service';
 import { Toast } from '../shared/toast';
 
-const shelves: BacklogItem = { id: 1, name: 'Hang shelves', estimatedMinutes: 45 };
-const gutters: BacklogItem = { id: 2, name: 'Clean gutters', estimatedMinutes: null };
+const shelves: BacklogItem = { id: 1, name: 'Hang shelves', estimatedMinutes: 45, assigneeId: null };
+const gutters: BacklogItem = { id: 2, name: 'Clean gutters', estimatedMinutes: null, assigneeId: null };
+const MEMBERS = [
+  { id: 1, displayName: 'Pat Lee' },
+  { id: 2, displayName: 'Sam Ray' },
+];
 
 /** The delete action sheet (BILLIAMVT-49): whether it's open, and what it asks. */
 const sheetOpen = (element: HTMLElement) => element.querySelector('dialog.sheet')!.hasAttribute('open');
@@ -34,22 +39,29 @@ describe('Backlog (BILLIAMVT-23)', () => {
       schedule: (id: number, date: string) => Observable<void>;
       done: (id: number, date: string) => Observable<void>;
       delete: (id: number) => Observable<void>;
+      assign: (id: number, assigneeId: number | null) => Observable<BacklogItem>;
       today: () => string;
     }> = {},
   ) {
     const backlog = {
       list: vi.fn(overrides.list ?? (() => of([shelves, gutters]))),
-      create: vi.fn(overrides.create ?? ((r: CreateItemRequest) => of({ id: 3, name: r.name, estimatedMinutes: r.estimatedMinutes ?? null }))),
+      create: vi.fn(
+        overrides.create ?? ((r: CreateItemRequest) => of({ id: 3, name: r.name, estimatedMinutes: r.estimatedMinutes ?? null, assigneeId: null })),
+      ),
       schedule: vi.fn(overrides.schedule ?? (() => of(undefined))),
       done: vi.fn(overrides.done ?? (() => of(undefined))),
       delete: vi.fn(overrides.delete ?? (() => of(undefined))),
+      assign: vi.fn(overrides.assign ?? (() => of(shelves))),
     };
     await TestBed.configureTestingModule({
       imports: [Backlog],
       providers: [
         { provide: BacklogService, useValue: backlog },
         // The household's today; the device's by default
-        { provide: HouseholdService, useValue: { today: overrides.today ?? (() => toIsoDate(new Date())) } },
+        {
+          provide: HouseholdService,
+          useValue: { today: overrides.today ?? (() => toIsoDate(new Date())), members: signal(MEMBERS) },
+        },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(Backlog);
@@ -83,9 +95,65 @@ describe('Backlog (BILLIAMVT-23)', () => {
     expect(element.querySelector('.menu')).toBeNull();
 
     await click('More for Hang shelves');
-    expect([...element.querySelectorAll('.menu button')].map((b) => b.textContent?.trim())).toEqual(['Mark done', 'Delete']);
+    expect([...element.querySelectorAll('.menu button')].map((b) => b.textContent?.trim())).toEqual(['Mark done', 'Assign', 'Delete']);
     await click('More for Hang shelves');
     expect(element.querySelector('.menu')).toBeNull();
+  });
+
+  describe('assigning an item (BILLIAMVT-64)', () => {
+    const assignSheet = (element: HTMLElement) => element.querySelectorAll<HTMLDialogElement>('dialog.sheet')[1];
+    const assigned = (id: number, assigneeId: number | null) => of({ ...shelves, assigneeId });
+
+    it("shows who an item is for by first name, and nothing for Anyone", async () => {
+      const { element } = await render({ list: () => of([{ ...shelves, assigneeId: 2 }, gutters]) });
+      const rows = element.querySelectorAll('.item');
+      expect(rows[0].querySelector('.assignee')?.textContent).toBe('Assigned to Sam');
+      expect(rows[1].querySelector('.assignee')).toBeNull();
+    });
+
+    it("asks who's doing it in an action sheet, assigns it, and offers Undo", async () => {
+      const { backlog, element, click, fixture } = await render({ assign: assigned });
+
+      await click('More for Hang shelves');
+      await click('Assign: Hang shelves');
+      expect(assignSheet(element).hasAttribute('open')).toBe(true);
+      expect(assignSheet(element).querySelector('.message')?.textContent?.trim()).toBe("Who's doing Hang shelves?");
+      const choices = [...assignSheet(element).querySelectorAll('.choice')];
+      expect(choices.map((c) => c.textContent?.trim())).toEqual(['Anyone', 'Pat Lee', 'Sam Ray']);
+      expect(choices[0].querySelector('input')!.checked).toBe(true);
+
+      choices[2].querySelector('input')!.click();
+      await fixture.whenStable();
+      [...assignSheet(element).querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Assign')!.click();
+      await fixture.whenStable();
+
+      expect(backlog.assign).toHaveBeenCalledWith(1, 2);
+      expect(assignSheet(element).hasAttribute('open')).toBe(false);
+      expect(element.querySelector('.item .assignee')?.textContent).toBe('Assigned to Sam');
+      const toast = TestBed.inject(Toast);
+      expect(toast.message()).toBe('Hang shelves: Sam.');
+      expect(toast.action()?.label).toBe('Undo');
+
+      toast.act();
+      await fixture.whenStable();
+      expect(backlog.assign).toHaveBeenLastCalledWith(1, null);
+      expect(element.querySelector('.item .assignee')).toBeNull();
+      expect(toast.message()).toBe('Hang shelves: back to Anyone.');
+      expect(toast.action()).toBeNull();
+    });
+
+    it('reloads with a notice when the item already left the backlog', async () => {
+      const { element, click, fixture } = await render({
+        assign: () => throwError(() => new HttpErrorResponse({ status: 404 })),
+      });
+      await click('More for Hang shelves');
+      await click('Assign: Hang shelves');
+      [...assignSheet(element).querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Assign')!.click();
+      await fixture.whenStable();
+
+      expect(assignSheet(element).hasAttribute('open')).toBe(false);
+      expect(element.querySelector('.notice')?.textContent).toContain('Hang shelves is no longer on the backlog.');
+    });
   });
 
   it('lists the items in the order added, with minutes', async () => {

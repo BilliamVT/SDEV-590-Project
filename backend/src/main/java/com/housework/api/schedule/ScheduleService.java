@@ -5,6 +5,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.function.BiFunction;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,6 +130,53 @@ public class ScheduleService {
 				date);
 		return occurrences.findScheduled(household.getId(), occurrenceId)
 			.map(row -> OccurrenceResponse.from(row, today))
+			.orElseThrow(OccurrenceNotFoundException::new);
+	}
+
+	/**
+	 * Gives one pending day its own assignee, or Anyone with null (BILLIAMVT-64). The task and its
+	 * other days don't change, and the day keeps this assignee if the task's assignee changes later.
+	 * Done and skipped days show who did them instead, so they can't be assigned.
+	 */
+	@Transactional
+	public OccurrenceResponse assign(long userId, long occurrenceId, Long assigneeId) {
+		return changeAssignment(userId, occurrenceId, (household, occurrence) -> {
+			households.checkMember(household.getId(), assigneeId);
+			occurrence.assignTo(assigneeId);
+			return assigneeId == null ? "anyone" : "user " + assigneeId;
+		});
+	}
+
+	/**
+	 * Clears a day's own assignee so it follows its task again (BILLIAMVT-64): what Undo uses when
+	 * the day had no assignee of its own. Same rules as {@link #assign}.
+	 */
+	@Transactional
+	public OccurrenceResponse followTask(long userId, long occurrenceId) {
+		return changeAssignment(userId, occurrenceId, (household, occurrence) -> {
+			occurrence.followTask();
+			return "its task's assignee";
+		});
+	}
+
+	/** Locks the day, checks it can be assigned, applies the change and returns the day. */
+	private OccurrenceResponse changeAssignment(long userId, long occurrenceId,
+			BiFunction<Household, Occurrence, String> change) {
+		Household household = households.householdOf(userId);
+		Occurrence occurrence = occurrences.lockInHousehold(occurrenceId, household.getId())
+			.orElseThrow(OccurrenceNotFoundException::new);
+		if (occurrence.getStatus() != OccurrenceStatus.PENDING) {
+			throw new OccurrenceNotAssignableException("Only a day that isn't done or skipped can be assigned.");
+		}
+		Task task = tasks.findById(occurrence.getTaskId()).orElseThrow(OccurrenceNotFoundException::new);
+		if (task.isDeleted()) {
+			throw new OccurrenceNotAssignableException("This task was deleted, so its days can't be assigned.");
+		}
+		String who = change.apply(household, occurrence);
+		occurrences.flush();
+		log.info("User {} assigned occurrence {} of task {} to {}", userId, occurrenceId, task.getId(), who);
+		return occurrences.findScheduled(household.getId(), occurrenceId)
+			.map(row -> OccurrenceResponse.from(row, today(household)))
 			.orElseThrow(OccurrenceNotFoundException::new);
 	}
 

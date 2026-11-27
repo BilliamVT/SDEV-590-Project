@@ -31,6 +31,10 @@
                 · {{ text }}
               }
             </span>
+            @if (assignee(task); as name) {
+              <!-- Who it's assigned to; nothing for Anyone (BILLIAMVT-64) -->
+              <span class="assignee"><span class="visually-hidden">Assigned to </span>{{ name }}</span>
+            }
             <!-- When it was last done and by whom; the week view has each day's detail (BILLIAMVT-26) -->
             <span class="last-done">{{ lastDone(task) }}</span>
           </div>

@@ -65,7 +65,10 @@ public class BacklogService {
 		if (request.date() != null) {
 			checkScheduleDate(household, request.date());
 		}
-		Task item = tasks.save(new Task(household.getId(), request.name().strip(), null, null, request.estimatedMinutes()));
+		households.checkMember(household.getId(), request.assigneeId());
+		Task item = new Task(household.getId(), request.name().strip(), null, null, request.estimatedMinutes());
+		item.assignTo(request.assigneeId());
+		item = tasks.save(item);
 		if (request.date() != null) {
 			occurrences.place(item.getId(), request.date(), OccurrenceStatus.PENDING.name(), null, null);
 			log.info("User {} added one-time task {} on a day in household {}", userId, item.getId(), household.getId());
@@ -83,6 +86,21 @@ public class BacklogService {
 		checkScheduleDate(household, date);
 		occurrences.place(item.getId(), date, OccurrenceStatus.PENDING.name(), null, null);
 		log.info("User {} scheduled backlog item {}", userId, item.getId());
+	}
+
+	/**
+	 * Sets who an open item is for, or Anyone with null (BILLIAMVT-64); once it's put on a day, the
+	 * day follows it. An item already on the schedule is assigned from the week view instead (404).
+	 */
+	@Transactional
+	public ItemResponse assign(long userId, long itemId, Long assigneeId) {
+		Household household = households.householdOf(userId);
+		Task item = openItem(household, itemId);
+		households.checkMember(household.getId(), assigneeId);
+		item.assignTo(assigneeId);
+		log.info("User {} assigned backlog item {} to {}", userId, item.getId(),
+				assigneeId == null ? "anyone" : "user " + assigneeId);
+		return ItemResponse.from(item);
 	}
 
 	/** A day an item can be put on: today (the household's) up to 2 years ahead. */

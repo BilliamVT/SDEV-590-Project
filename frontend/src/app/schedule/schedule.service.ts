@@ -25,6 +25,16 @@ export class ScheduleService {
     return this.http.put<ScheduledOccurrence>(`${environment.apiUrl}/api/occurrences/${id}/date`, { date });
   }
 
+  /** Gives one day its own assignee, or Anyone with null; returns it (BILLIAMVT-64). */
+  assign(id: number, assigneeId: number | null): Observable<ScheduledOccurrence> {
+    return this.http.put<ScheduledOccurrence>(`${environment.apiUrl}/api/occurrences/${id}/assignee`, { assigneeId });
+  }
+
+  /** Clears one day's own assignee, so it follows its task again; returns it (BILLIAMVT-64, Undo). */
+  followTask(id: number): Observable<ScheduledOccurrence> {
+    return this.http.delete<ScheduledOccurrence>(`${environment.apiUrl}/api/occurrences/${id}/assignee`);
+  }
+
   /** Deletes one occurrence for good (BILLIAMVT-25). */
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${environment.apiUrl}/api/occurrences/${id}`);

@@ -22,7 +22,7 @@ describe('Home', () => {
       imports: [Home],
       providers: [
         provideRouter([]),
-        { provide: HouseholdService, useValue: { load: () => NEVER } },
+        { provide: HouseholdService, useValue: { load: () => NEVER, members: () => [] } },
         { provide: ScheduleService, useValue: { between: () => NEVER } },
         { provide: BacklogService, useValue: backlog },
         { provide: AuthService, useValue: { user: signal({ id: 2, email: 'bill@example.com', displayName: 'Bill' }) } },

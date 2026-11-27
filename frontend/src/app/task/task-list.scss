@@ -40,6 +40,13 @@
   font-size: var(--text-sm);
 }
 
+.assignee {
+  flex-basis: 100%;
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
 .badge {
   padding: 0 var(--space-2);
   border: 1px solid var(--color-border);

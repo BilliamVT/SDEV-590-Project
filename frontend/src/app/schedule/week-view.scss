@@ -174,6 +174,13 @@
   white-space: nowrap;
 }
 
+// Who a pending day is assigned to (BILLIAMVT-64): the first name in the app's teal, quieter than
+// Overdue's pill so the two don't compete
+.assignee {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
 // The day picker inside the move sheet (BILLIAMVT-56)
 .move-field {
   margin: 0 0 var(--space-4);

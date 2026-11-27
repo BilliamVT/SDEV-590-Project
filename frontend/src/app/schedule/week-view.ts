@@ -7,6 +7,8 @@ import { AuthService } from '../auth/auth.service';
 import { errorMessage } from '../auth/error-message';
 import { BacklogService } from '../backlog/backlog.service';
 import { FeatureFlagsService } from '../feature/feature-flags.service';
+import { firstName } from '../household/household.models';
+import { HouseholdService } from '../household/household.service';
 import { Announcer } from '../shared/announcer';
 import { Toast, ToastAction } from '../shared/toast';
 import { ConfirmSheet } from '../shared/confirm-sheet';
@@ -44,6 +46,7 @@ export class WeekView {
   private readonly auth = inject(AuthService);
   private readonly flags = inject(FeatureFlagsService);
   private readonly toast = inject(Toast);
+  private readonly households = inject(HouseholdService);
   private readonly host = inject(ElementRef<HTMLElement>).nativeElement;
 
   /** A status changed or a day was deleted; a one-off item may be back in the backlog (BILLIAMVT-23). */
@@ -98,6 +101,12 @@ export class WeekView {
   /** The day the Move sheet is open for, and the day picked (BILLIAMVT-56) */
   protected readonly choosingMove = signal<number | null>(null);
   protected readonly moveDate = signal('');
+  /** The day the Assign sheet is open for, and who's picked: a member's id, or null for Anyone (BILLIAMVT-64) */
+  protected readonly choosingAssign = signal<number | null>(null);
+  protected readonly assignChoice = signal<number | null>(null);
+  /** Who a day can be assigned to */
+  protected readonly members = this.households.members;
+  protected readonly firstName = firstName;
   /**
    * Says that an action found its day already changed, and the week was reloaded (BILLIAMVT-55).
    * Shown as a status message, so screen readers read it too; cleared by the next action.
@@ -152,8 +161,22 @@ export class WeekView {
     return occurrence ? `Move ${occurrence.taskName} from ${dayLabel(occurrence.date)} to:` : '';
   });
 
+  /** The day the assign sheet is asking about */
+  protected readonly pendingAssign = computed(
+    () => this.schedule()?.occurrences.find((o) => o.id === this.choosingAssign()) ?? null,
+  );
+
+  protected readonly assignMessage = computed(() => {
+    const occurrence = this.pendingAssign();
+    return occurrence ? `Who's doing ${occurrence.taskName} on ${dayLabel(occurrence.date)}?` : '';
+  });
+
   constructor() {
     this.load();
+    // The members to choose from when assigning a day (BILLIAMVT-64)
+    if (this.households.members() === null) {
+      this.households.load().subscribe({ error: () => undefined });
+    }
     this.stopScrollingWhileDragging();
   }
 
@@ -438,6 +461,92 @@ export class WeekView {
     };
   }
 
+  /**
+   * Assign in the ⋯ menu (BILLIAMVT-64): gives this day its own assignee, or Anyone. The task and
+   * its other days keep theirs.
+   */
+  protected startAssign(occurrence: ScheduledOccurrence): void {
+    this.menuOpen.set(null);
+    this.notice.set(null);
+    this.itemErrors.update((errors) => removeError(errors, occurrence.id));
+    this.assignChoice.set(occurrence.assigneeId);
+    this.choosingAssign.set(occurrence.id);
+  }
+
+  protected confirmAssign(): void {
+    const occurrence = this.pendingAssign();
+    if (!occurrence) {
+      return;
+    }
+    const id = occurrence.id;
+    this.saving.update((ids) => new Set(ids).add(id));
+    this.itemErrors.update((errors) => removeError(errors, id));
+    this.schedules.assign(id, this.assignChoice()).subscribe({
+      next: (assigned) => {
+        this.schedule.update(
+          (schedule) => schedule && { ...schedule, occurrences: schedule.occurrences.map((o) => (o.id === id ? assigned : o)) },
+        );
+        this.saving.update((ids) => removeId(ids, id));
+        this.choosingAssign.set(null);
+        const who = assigned.assigneeName ? firstName(assigned.assigneeName) : 'Anyone';
+        this.toast.show(`${assigned.taskName} on ${dayLabel(assigned.date)}: ${who}.`, this.undoAssign(occurrence));
+        this.focusMore(id);
+      },
+      error: (err: unknown) => {
+        if (isStale(err)) {
+          this.choosingAssign.set(null);
+          this.failed(occurrence, err);
+        } else {
+          this.saving.update((ids) => removeId(ids, id));
+          this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
+        }
+      },
+    });
+  }
+
+  /**
+   * Undo for an assign's toast: puts the day back exactly as it was, following its task again if it
+   * had no assignee of its own, or its previous one if it did. If the day changed in the meantime,
+   * the week reloads with BILLIAMVT-55's notices.
+   */
+  private undoAssign(before: ScheduledOccurrence): ToastAction {
+    const id = before.id;
+    return {
+      label: 'Undo',
+      run: () => {
+        this.notice.set(null);
+        this.itemErrors.update((errors) => removeError(errors, id));
+        this.saving.update((ids) => new Set(ids).add(id));
+        const request = before.assignmentSet
+          ? this.schedules.assign(id, before.assigneeId)
+          : this.schedules.followTask(id);
+        request.subscribe({
+          next: (back) => {
+            this.schedule.update(
+              (schedule) => schedule && { ...schedule, occurrences: schedule.occurrences.map((o) => (o.id === id ? back : o)) },
+            );
+            this.saving.update((ids) => removeId(ids, id));
+            const who = back.assigneeName ? firstName(back.assigneeName) : 'Anyone';
+            this.toast.show(`${back.taskName} on ${dayLabel(back.date)}: back to ${who}.`);
+            // The Undo button is gone, so focus goes to the row's ⋯ button
+            this.focusMore(id);
+          },
+          error: (err: unknown) => this.failed(before, err),
+        });
+      },
+    };
+  }
+
+  /** The assign sheet was cancelled: focus goes back to the row's ⋯ button. */
+  protected cancelAssign(): void {
+    const id = this.choosingAssign();
+    this.choosingAssign.set(null);
+    if (id !== null) {
+      this.itemErrors.update((errors) => removeError(errors, id));
+      this.focusMore(id);
+    }
+  }
+
   /** The move sheet was cancelled: focus goes back to the row's ⋯ button. */
   protected cancelMove(): void {
     const id = this.choosingMove();
@@ -452,6 +561,7 @@ export class WeekView {
   protected toggleMenu(occurrence: ScheduledOccurrence): void {
     this.choosingDelete.set(null);
     this.choosingMove.set(null);
+    this.choosingAssign.set(null);
     this.menuOpen.update((open) => (open === occurrence.id ? null : occurrence.id));
   }
 

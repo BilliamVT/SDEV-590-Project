@@ -325,3 +325,18 @@ label {
     scale: 1.03;
   }
 }
+
+// The members to choose from in an assign sheet (BILLIAMVT-64; week view and backlog): full-width rows at touch size
+.assign-choices {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: none;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch);
+  font-weight: normal;
+}

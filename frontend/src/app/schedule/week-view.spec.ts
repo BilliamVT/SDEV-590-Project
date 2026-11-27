@@ -6,11 +6,18 @@ import { NEVER, Observable, of, throwError } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 import { BacklogService } from '../backlog/backlog.service';
 import { FeatureFlagsService } from '../feature/feature-flags.service';
+import { HouseholdService } from '../household/household.service';
 import { Announcer } from '../shared/announcer';
 import { Toast } from '../shared/toast';
 import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
 import { ScheduleService } from './schedule.service';
 import { WeekView } from './week-view';
+
+/** The household's members, to assign days to (BILLIAMVT-64) */
+const MEMBERS = [
+  { id: 1, displayName: 'Pat Lee' },
+  { id: 2, displayName: 'Sam Ray' },
+];
 
 const occurrence = (id: number, taskName: string, date: string, extra: Partial<ScheduledOccurrence> = {}): ScheduledOccurrence => ({
   id,
@@ -26,6 +33,9 @@ const occurrence = (id: number, taskName: string, date: string, extra: Partial<S
   completedById: null,
   completedAt: null,
   oneOff: false,
+  assigneeId: null,
+  assigneeName: null,
+  assignmentSet: false,
   ...extra,
 });
 
@@ -62,12 +72,16 @@ describe('WeekView', () => {
     remove: (id: number) => Observable<void> = () => of(undefined),
     deleteItem: (id: number) => Observable<void> = () => of(undefined),
     move: (id: number, date: string) => Observable<ScheduledOccurrence> = () => NEVER,
+    assign: (id: number, assigneeId: number | null) => Observable<ScheduledOccurrence> = () => NEVER,
+    followTask: (id: number) => Observable<ScheduledOccurrence> = () => NEVER,
   ) {
     const schedules = {
       between: vi.fn(between),
       changeStatus: vi.fn(changeStatus),
       delete: vi.fn(remove),
       move: vi.fn(move),
+      assign: vi.fn(assign),
+      followTask: vi.fn(followTask),
     };
     const backlog = { delete: vi.fn(deleteItem) };
     await TestBed.configureTestingModule({
@@ -77,6 +91,7 @@ describe('WeekView', () => {
         { provide: BacklogService, useValue: backlog },
         { provide: AuthService, useValue: { user: signal({ id: ME, email: 'pat@example.com', displayName: 'Pat' }) } },
         { provide: FeatureFlagsService, useValue: { dragDrop } },
+        { provide: HouseholdService, useValue: { members: signal(MEMBERS), load: () => NEVER } },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(WeekView);
@@ -383,7 +398,7 @@ describe('WeekView', () => {
       expect(element.querySelector('.menu')).toBeNull();
       await click('More for Dishes on Wednesday, Nov 11');
       // Move too, since BILLIAMVT-56
-      expect(menu()).toEqual(['Move', 'Skip', 'Delete']);
+      expect(menu()).toEqual(['Move', 'Assign', 'Skip', 'Delete']);
       // Only one menu at a time
       await click('More for Vacuum on Wednesday, Nov 11');
       expect(menu()).toEqual(['Delete']);
@@ -454,6 +469,7 @@ describe('WeekView', () => {
       await openMenu(click);
       expect([...element.querySelectorAll('.menu button')].map((b) => b.textContent?.trim())).toEqual([
         'Move',
+        'Assign',
         'Back to backlog',
         'Delete',
       ]);
@@ -640,6 +656,152 @@ describe('WeekView', () => {
     });
   });
 
+  describe('assigning (BILLIAMVT-64)', () => {
+    const assignSheet = (element: HTMLElement) => element.querySelectorAll<HTMLDialogElement>('dialog.sheet')[2];
+    const choices = (element: HTMLElement) =>
+      [...assignSheet(element).querySelectorAll<HTMLLabelElement>('.choice')].map((label) => ({
+        name: label.textContent?.trim(),
+        checked: label.querySelector('input')!.checked,
+      }));
+    const choose = async (element: HTMLElement, fixture: { whenStable: () => Promise<unknown> }, name: string) => {
+      const label = [...assignSheet(element).querySelectorAll('.choice')].find((l) => l.textContent?.trim() === name)!;
+      label.querySelector('input')!.click();
+      await fixture.whenStable();
+    };
+    const confirm = async (element: HTMLElement, fixture: { whenStable: () => Promise<unknown> }) => {
+      [...assignSheet(element).querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Assign')!.click();
+      await fixture.whenStable();
+    };
+
+    it("shows a pending day's assignee by first name, and who did it once it's done", async () => {
+      const vacuum = occurrence(1, 'Vacuum', '2026-11-11', { assigneeId: 2, assigneeName: 'Sam Ray' });
+      const dishes = occurrence(2, 'Dishes', '2026-11-11', {
+        assigneeId: 2,
+        assigneeName: 'Sam Ray',
+        status: 'DONE',
+        completedById: ME,
+        completedByName: 'Pat',
+      });
+      const mop = occurrence(3, 'Mop', '2026-11-11');
+      const { element } = await render((from, to) => of(schedule(from, to, [vacuum, dishes, mop])));
+      const meta = (name: string) =>
+        [...element.querySelectorAll('.occurrence')].find((row) => row.querySelector('.name')?.textContent === name)!.querySelector('.meta')!;
+
+      expect(meta('Vacuum').querySelector('.assignee')?.textContent).toBe('Assigned to Sam');
+      expect(meta('Vacuum').querySelector('.assignee .visually-hidden')?.textContent).toBe('Assigned to ');
+      expect(meta('Dishes').textContent).toContain('Done by Pat');
+      expect(meta('Dishes').querySelector('.assignee')).toBeNull();
+      // Anyone shows nothing
+      expect(meta('Mop').querySelector('.assignee')).toBeNull();
+    });
+
+    it("asks who's doing it, with the day's assignee chosen, and assigns that day", async () => {
+      const vacuum = occurrence(1, 'Vacuum', '2026-11-11');
+      const { schedules, element, click, fixture } = await render(
+        (from, to) => of(schedule(from, to, [vacuum])),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        (id, assigneeId) => of({ ...vacuum, assigneeId, assigneeName: assigneeId === 2 ? 'Sam Ray' : null }),
+      );
+
+      await click('More for Vacuum on Wednesday, Nov 11');
+      await click('Assign: Vacuum');
+      expect(sheetOpen(element)).toBe(true);
+      expect(assignSheet(element).textContent).toContain("Who's doing Vacuum on Wednesday, Nov 11?");
+      expect(choices(element)).toEqual([
+        { name: 'Anyone', checked: true },
+        { name: 'Pat Lee', checked: false },
+        { name: 'Sam Ray', checked: false },
+      ]);
+
+      await choose(element, fixture, 'Sam Ray');
+      await confirm(element, fixture);
+
+      expect(schedules.assign).toHaveBeenCalledWith(1, 2);
+      expect(sheetOpen(element)).toBe(false);
+      expect(element.querySelector('.assignee')?.textContent).toBe('Assigned to Sam');
+      expect(TestBed.inject(Toast).message()).toBe('Vacuum on Wednesday, Nov 11: Sam.');
+    });
+
+    it('can set a day back to Anyone', async () => {
+      const vacuum = occurrence(1, 'Vacuum', '2026-11-11', { assigneeId: 2, assigneeName: 'Sam Ray' });
+      const { schedules, element, click, fixture } = await render(
+        (from, to) => of(schedule(from, to, [vacuum])),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        () => of({ ...vacuum, assigneeId: null, assigneeName: null }),
+      );
+
+      await click('More for Vacuum on Wednesday, Nov 11');
+      await click('Assign: Vacuum');
+      expect(choices(element).find((c) => c.checked)?.name).toBe('Sam Ray');
+      await choose(element, fixture, 'Anyone');
+      await confirm(element, fixture);
+
+      expect(schedules.assign).toHaveBeenCalledWith(1, null);
+      expect(element.querySelector('.assignee')).toBeNull();
+      expect(TestBed.inject(Toast).message()).toBe('Vacuum on Wednesday, Nov 11: Anyone.');
+    });
+
+    it("undo puts a day that followed its task back to following it", async () => {
+      // Sam through the task, not the day's own choice
+      const vacuum = occurrence(1, 'Vacuum', '2026-11-11', { assigneeId: 2, assigneeName: 'Sam Ray' });
+      const { schedules, element, click, fixture } = await render(
+        (from, to) => of(schedule(from, to, [vacuum])),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        () => of({ ...vacuum, assigneeId: ME, assigneeName: 'Pat Lee', assignmentSet: true }),
+        () => of(vacuum),
+      );
+
+      await click('More for Vacuum on Wednesday, Nov 11');
+      await click('Assign: Vacuum');
+      await choose(element, fixture, 'Pat Lee');
+      await confirm(element, fixture);
+      const toast = TestBed.inject(Toast);
+      expect(toast.action()?.label).toBe('Undo');
+
+      toast.act();
+      await fixture.whenStable();
+
+      expect(schedules.followTask).toHaveBeenCalledWith(1);
+      expect(schedules.assign).toHaveBeenCalledTimes(1);
+      expect(element.querySelector('.assignee')?.textContent).toBe('Assigned to Sam');
+      expect(toast.message()).toBe('Vacuum on Wednesday, Nov 11: back to Sam.');
+      expect(toast.action()).toBeNull();
+    });
+
+    it("undo gives a day with its own assignee that assignee back", async () => {
+      const vacuum = occurrence(1, 'Vacuum', '2026-11-11', { assigneeId: 2, assigneeName: 'Sam Ray', assignmentSet: true });
+      const { schedules, element, click, fixture } = await render(
+        (from, to) => of(schedule(from, to, [vacuum])),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        (id, assigneeId) =>
+          of({ ...vacuum, assigneeId, assigneeName: assigneeId === 2 ? 'Sam Ray' : null, assignmentSet: true }),
+      );
+
+      await click('More for Vacuum on Wednesday, Nov 11');
+      await click('Assign: Vacuum');
+      await choose(element, fixture, 'Anyone');
+      await confirm(element, fixture);
+      TestBed.inject(Toast).act();
+      await fixture.whenStable();
+
+      expect(schedules.assign).toHaveBeenLastCalledWith(1, 2);
+      expect(schedules.followTask).not.toHaveBeenCalled();
+      expect(element.querySelector('.assignee')?.textContent).toBe('Assigned to Sam');
+    });
+  });
+
   describe('moving a day with the menu (BILLIAMVT-56)', () => {
     const vacuum = occurrence(1, 'Vacuum', '2026-11-11');
     const withVacuum = (from: string, to: string) => of(schedule(from, to, [vacuum]));
@@ -666,11 +828,11 @@ describe('WeekView', () => {
       const menu = () => [...element.querySelectorAll('.menu button')].map((b) => b.textContent?.trim());
 
       await click('More for Vacuum on Wednesday, Nov 11');
-      expect(menu()).toEqual(['Move', 'Skip', 'Delete']);
+      expect(menu()).toEqual(['Move', 'Assign', 'Skip', 'Delete']);
       await click('More for Dishes on Wednesday, Nov 11');
       expect(menu()).toEqual(['Delete']);
       await click('More for Hang shelves on Wednesday, Nov 11');
-      expect(menu()).toEqual(['Move', 'Back to backlog', 'Delete']);
+      expect(menu()).toEqual(['Move', 'Assign', 'Back to backlog', 'Delete']);
     });
 
     it('asks for a day, from today to the viewing limit, starting on the day it is on', async () => {

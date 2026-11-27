@@ -65,6 +65,11 @@ public class HouseholdService {
 		user.moveToHousehold(target.getId());
 		users.saveAndFlush(user);
 		log.info("User {} joined household {}", user.getId(), target.getId());
+		if (previousId != null) {
+			// What they were assigned in the old household goes back to Anyone (BILLIAMVT-64)
+			households.unassignTasks(previousId, user.getId());
+			households.unassignOccurrences(previousId, user.getId());
+		}
 		deleteIfEmpty(previousId);
 		return response(target);
 	}
@@ -101,6 +106,21 @@ public class HouseholdService {
 		household.replaceInviteCode(uniqueInviteCode());
 		log.info("User {} replaced the invite code of household {}", user.getId(), household.getId());
 		return response(household);
+	}
+
+	/**
+	 * Checks that an assignee is a member of the household (BILLIAMVT-64); null (Anyone) always
+	 * passes. Unknown users and other households' members get the same error.
+	 */
+	@Transactional(readOnly = true)
+	public void checkMember(long householdId, Long userId) {
+		if (userId == null) {
+			return;
+		}
+		boolean member = users.findById(userId).map(u -> Long.valueOf(householdId).equals(u.getHouseholdId())).orElse(false);
+		if (!member) {
+			throw new InvalidAssigneeException();
+		}
 	}
 
 	/** The logged-in user's household, for code that stores data in it (decision record 0005). */

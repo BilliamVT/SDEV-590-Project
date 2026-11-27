@@ -39,6 +39,12 @@ public class Occurrence {
 
 	private Instant completedAt;
 
+	/** This day's own assignee (BILLIAMVT-64), used once assignmentSet is true; null means Anyone. */
+	private Long assignedTo;
+
+	/** False: the day follows its task's assignee. */
+	private boolean assignmentSet;
+
 	@CreationTimestamp
 	private Instant createdAt;
 
@@ -66,6 +72,21 @@ public class Occurrence {
 
 	public OccurrenceStatus getStatus() {
 		return status;
+	}
+
+	/**
+	 * Gives this day its own assignee, or Anyone with null (BILLIAMVT-64). From then on the
+	 * task's assignee doesn't apply to it, and regenerating the task keeps it (deleteReplaceable).
+	 */
+	void assignTo(Long userId) {
+		assignedTo = userId;
+		assignmentSet = true;
+	}
+
+	/** Back to following its task's assignee (BILLIAMVT-64, Undo). */
+	void followTask() {
+		assignedTo = null;
+		assignmentSet = false;
 	}
 
 	/** To another day (BILLIAMVT-27); back on its original date it's a normal day again. */

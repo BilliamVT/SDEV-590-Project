@@ -66,6 +66,10 @@
                   @if (minutes(item); as text) {
                     <span class="minutes">{{ text }}</span>
                   }
+                  @if (assignee(item); as name) {
+                    <!-- Who it's for; nothing for Anyone (BILLIAMVT-64) -->
+                    <span class="assignee"><span class="visually-hidden">Assigned to </span>{{ name }}</span>
+                  }
                 </div>
                 <button
                   type="button"
@@ -121,6 +125,14 @@
                   </button>
                   <button
                     type="button"
+                    [attr.aria-label]="'Assign: ' + item.name"
+                    [disabled]="saving().has(item.id)"
+                    (click)="startAssign(item)"
+                  >
+                    Assign
+                  </button>
+                  <button
+                    type="button"
                     class="destructive"
                     [attr.aria-label]="'Delete: ' + item.name"
                     [disabled]="saving().has(item.id)"
@@ -148,5 +160,34 @@
       (confirmed)="confirmDelete(pendingDelete()!)"
       (cancelled)="cancelDelete()"
     />
+
+    <!-- Who an item is for (BILLIAMVT-64): the same action sheet as the week view's Assign -->
+    <app-confirm-sheet
+      [open]="pendingAssign() !== null"
+      [message]="assignMessage()"
+      confirmLabel="Assign"
+      busyLabel="Assigning…"
+      confirmClass="primary"
+      [busy]="pendingAssign() !== null && saving().has(pendingAssign()!.id)"
+      [error]="pendingAssign() ? (itemErrors().get(pendingAssign()!.id) ?? null) : null"
+      (confirmed)="confirmAssign()"
+      (cancelled)="cancelAssign()"
+    >
+      @if (pendingAssign()) {
+        <fieldset class="assign-choices">
+          <legend class="visually-hidden">Assigned to</legend>
+          <label class="choice">
+            <input type="radio" name="backlog-assignee" [checked]="assignChoice() === null" (change)="assignChoice.set(null)" />
+            Anyone
+          </label>
+          @for (member of members() ?? []; track member.id) {
+            <label class="choice">
+              <input type="radio" name="backlog-assignee" [checked]="assignChoice() === member.id" (change)="assignChoice.set(member.id)" />
+              {{ member.displayName }}
+            </label>
+          }
+        </fieldset>
+      }
+    </app-confirm-sheet>
   </section>
 }

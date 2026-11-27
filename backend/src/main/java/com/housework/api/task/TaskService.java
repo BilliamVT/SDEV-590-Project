@@ -65,8 +65,11 @@ public class TaskService {
 		Household household = households.householdOf(userId);
 		LocalDate today = today(household);
 		Schedule schedule = schedule(request, today);
-		Task task = tasks.save(new Task(household.getId(), request.name().strip(), schedule.rule(), schedule.startsOn(),
-				request.estimatedMinutes()));
+		households.checkMember(household.getId(), request.assigneeId());
+		Task task = new Task(household.getId(), request.name().strip(), schedule.rule(), schedule.startsOn(),
+				request.estimatedMinutes());
+		task.assignTo(request.assigneeId());
+		task = tasks.save(task);
 		log.info("User {} created task {} in household {}", userId, task.getId(), household.getId());
 		// Ready before anyone opens the schedule (BILLIAMVT-38)
 		this.schedule.generateAhead(task, today);
@@ -97,7 +100,10 @@ public class TaskService {
 		Household household = households.householdOf(userId);
 		Task task = task(household, taskId);
 		LocalDate today = today(household);
+		households.checkMember(household.getId(), request.assigneeId());
 		task.rename(request.name().strip(), request.estimatedMinutes());
+		// Days given their own assignee keep it; the rest follow the task (V5)
+		task.assignTo(request.assigneeId());
 		if (scheduleChanged(task, request)) {
 			Schedule schedule = schedule(request, today);
 			task.reschedule(schedule.rule(), schedule.startsOn());

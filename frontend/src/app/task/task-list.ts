@@ -6,6 +6,8 @@ import { errorMessage } from '../auth/error-message';
 import { Announcer } from '../shared/announcer';
 import { ConfirmSheet } from '../shared/confirm-sheet';
 import { focusLater } from '../shared/focus';
+import { firstName } from '../household/household.models';
+import { HouseholdService } from '../household/household.service';
 import { shortDayLabel } from '../schedule/dates';
 import { Task } from './task.models';
 import { TaskService } from './task.service';
@@ -21,6 +23,7 @@ export class TaskList {
   private readonly host = inject(ElementRef<HTMLElement>).nativeElement;
   private readonly announcer = inject(Announcer);
   private readonly tasks = inject(TaskService);
+  private readonly households = inject(HouseholdService);
 
   protected readonly list = signal<Task[] | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -32,6 +35,10 @@ export class TaskList {
 
   constructor() {
     this.load();
+    // Members name each task's assignee (BILLIAMVT-64); reached straight from a link they may not be known yet
+    if (this.households.members() === null) {
+      this.households.load().subscribe({ error: () => undefined });
+    }
   }
 
   /** Also the Try again button when loading failed (BILLIAMVT-53). */
@@ -45,6 +52,12 @@ export class TaskList {
 
   protected minutes(task: Task): string | null {
     return task.estimatedMinutes ? `${task.estimatedMinutes} min` : null;
+  }
+
+  /** The assignee's first name (BILLIAMVT-64); null for Anyone, or while members are loading */
+  protected assignee(task: Task): string | null {
+    const member = this.households.members()?.find((m) => m.id === task.assigneeId);
+    return member ? firstName(member.displayName) : null;
   }
 
   /** "Last done Thu, Nov 12 by Sam", or "Not done yet" (BILLIAMVT-26) */

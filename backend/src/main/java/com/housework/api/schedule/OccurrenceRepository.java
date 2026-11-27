@@ -38,12 +38,15 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 	void place(@Param("taskId") long taskId, @Param("date") LocalDate date, @Param("status") String status,
 			@Param("completedBy") Long completedBy, @Param("completedAt") Instant completedAt);
 
-	/** Future occurrences that are still pending and haven't been moved; the ones regeneration replaces. */
+	/**
+	 * Future occurrences that are still pending, haven't been moved and haven't been given their
+	 * own assignee (BILLIAMVT-64); the ones regeneration replaces.
+	 */
 	@Modifying
 	@Query(value = """
 			delete from occurrence
 			where task_id = :taskId and original_date >= :from
-			  and status = 'PENDING' and scheduled_date = original_date""", nativeQuery = true)
+			  and status = 'PENDING' and scheduled_date = original_date and not assignment_set""", nativeQuery = true)
 	int deleteReplaceable(@Param("taskId") long taskId, @Param("from") LocalDate from);
 
 	/** Every future occurrence still pending, moved or not; removed when a task is deleted. */
@@ -77,15 +80,19 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 
 	}
 
-	/** The schedule's row shape: the occurrence, its task, and who completed it (if anyone). */
+	/**
+	 * The schedule's row shape: the occurrence, its task, who completed it (if anyone), and who
+	 * it's assigned to: the day's own assignee once set, otherwise the task's (BILLIAMVT-64).
+	 */
 	String SCHEDULE_ROW = """
 			select new com.housework.api.schedule.ScheduleDtos$ScheduledOccurrence(
 			    o.id, t.id, t.name, o.scheduledDate, o.originalDate, o.status, t.estimatedMinutes,
 			    case when t.deletedAt is null then false else true end, u.id, u.displayName, o.completedAt,
-			    case when t.recurrenceRule is null then true else false end)
+			    case when t.recurrenceRule is null then true else false end, a.id, a.displayName, o.assignmentSet)
 			from Occurrence o
 			join Task t on t.id = o.taskId
 			left join AppUser u on u.id = o.completedBy
+			left join AppUser a on a.id = (case when o.assignmentSet = true then o.assignedTo else t.assignedTo end)
 			""";
 
 	/**

@@ -15,7 +15,8 @@ public final class ScheduleDtos {
 	/** One row of the schedule query (OccurrenceRepository.findSchedule). */
 	public record ScheduledOccurrence(Long id, Long taskId, String taskName, LocalDate date, LocalDate originalDate,
 			OccurrenceStatus status, Integer estimatedMinutes, boolean taskDeleted, Long completedById,
-			String completedByName, Instant completedAt, boolean oneOff) {
+			String completedByName, Instant completedAt, boolean oneOff, Long assigneeId, String assigneeName,
+			boolean assignmentSet) {
 	}
 
 	/**
@@ -24,18 +25,22 @@ public final class ScheduleDtos {
 	 * backlog item's day, which can go back to the backlog when deleted (BILLIAMVT-23).
 	 * {@code completedById}: who marked it done or skipped, so the front end can tell "you" from
 	 * another member with the same name; null while pending or if that account was deleted
-	 * (BILLIAMVT-55).
+	 * (BILLIAMVT-55). {@code assigneeId}/{@code assigneeName}: who it's assigned to, the day's own
+	 * assignee or else the task's; null for Anyone (BILLIAMVT-64). {@code assignmentSet}: the day has
+	 * its own assignee (Anyone included) rather than following its task's, so Undo can put it back.
 	 */
 	public record OccurrenceResponse(Long id, Long taskId, String taskName, LocalDate date, LocalDate originalDate,
 			OccurrenceStatus status, Integer estimatedMinutes, boolean overdue, boolean taskDeleted,
-			Long completedById, String completedByName, Instant completedAt, boolean oneOff) {
+			Long completedById, String completedByName, Instant completedAt, boolean oneOff, Long assigneeId,
+			String assigneeName, boolean assignmentSet) {
 
 		static OccurrenceResponse from(ScheduledOccurrence row, LocalDate today) {
 			boolean overdue = !row.taskDeleted() && row.status() == OccurrenceStatus.PENDING
 					&& row.date().isBefore(today);
 			return new OccurrenceResponse(row.id(), row.taskId(), row.taskName(), row.date(), row.originalDate(),
 					row.status(), row.estimatedMinutes(), overdue, row.taskDeleted(), row.completedById(),
-					row.completedByName(), row.completedAt(), row.oneOff());
+					row.completedByName(), row.completedAt(), row.oneOff(), row.assigneeId(), row.assigneeName(),
+					row.assignmentSet());
 		}
 
 	}
@@ -46,6 +51,10 @@ public final class ScheduleDtos {
 
 	/** PUT /api/occurrences/{id}/date: the day to move it to (BILLIAMVT-27). */
 	public record MoveRequest(@NotNull LocalDate date) {
+	}
+
+	/** PUT /api/occurrences/{id}/assignee: a household member, or null for Anyone (BILLIAMVT-64). */
+	public record AssignRequest(Long assigneeId) {
 	}
 
 	/**
