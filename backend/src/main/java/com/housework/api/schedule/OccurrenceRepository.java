@@ -88,7 +88,7 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 			select new com.housework.api.schedule.ScheduleDtos$ScheduledOccurrence(
 			    o.id, t.id, t.name, o.scheduledDate, o.originalDate, o.status, t.estimatedMinutes,
 			    case when t.deletedAt is null then false else true end, u.id, u.displayName, o.completedAt,
-			    case when t.recurrenceRule is null then true else false end, a.id, a.displayName, o.assignmentSet)
+			    case when t.recurrenceRule is null then true else false end, a.id, a.displayName, o.assignmentSet, t.color)
 			from Occurrence o
 			join Task t on t.id = o.taskId
 			left join AppUser u on u.id = o.completedBy

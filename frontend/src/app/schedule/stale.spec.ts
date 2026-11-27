@@ -20,6 +20,7 @@ const vacuum = (extra: Partial<ScheduledOccurrence> = {}): ScheduledOccurrence =
   assigneeId: null,
   assigneeName: null,
   assignmentSet: false,
+  color: null,
   ...extra,
 });
 

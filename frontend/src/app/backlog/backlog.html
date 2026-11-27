@@ -62,7 +62,7 @@
               <!-- A row like the week view's (BILLIAMVT-49): Schedule is the main action; the rest is under ⋯ -->
               <div class="row">
                 <div class="details">
-                  <span class="name">{{ item.name }}</span>
+                  <span class="name"><app-task-color-dot [color]="item.color" />{{ item.name }}</span>
                   @if (minutes(item); as text) {
                     <span class="minutes">{{ text }}</span>
                   }

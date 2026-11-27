@@ -69,6 +69,7 @@ public class TaskService {
 		Task task = new Task(household.getId(), request.name().strip(), schedule.rule(), schedule.startsOn(),
 				request.estimatedMinutes());
 		task.assignTo(request.assigneeId());
+		task.setColor(request.color());
 		task = tasks.save(task);
 		log.info("User {} created task {} in household {}", userId, task.getId(), household.getId());
 		// Ready before anyone opens the schedule (BILLIAMVT-38)
@@ -104,6 +105,7 @@ public class TaskService {
 		task.rename(request.name().strip(), request.estimatedMinutes());
 		// Days given their own assignee keep it; the rest follow the task (V5)
 		task.assignTo(request.assigneeId());
+		task.setColor(request.color());
 		if (scheduleChanged(task, request)) {
 			Schedule schedule = schedule(request, today);
 			task.reschedule(schedule.rule(), schedule.startsOn());

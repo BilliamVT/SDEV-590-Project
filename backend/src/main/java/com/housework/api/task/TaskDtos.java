@@ -38,13 +38,15 @@ public final class TaskDtos {
 			/** Optional; up to a full day */
 			@Min(1) @Max(1440) Integer estimatedMinutes,
 			/** A household member, or null for Anyone (BILLIAMVT-64) */
-			Long assigneeId) {
+			Long assigneeId,
+			/** Optional; null for none (BILLIAMVT-65) */
+			TaskColor color) {
 	}
 
 	/** Includes the menu fields the rule was built from, so the edit form can be filled in. */
 	public record TaskResponse(Long id, String name, String recurrenceRule, String schedule, Frequency frequency,
 			Integer interval, List<DayOfWeek> daysOfWeek, Integer dayOfMonth, LocalDate startsOn, Integer estimatedMinutes,
-			boolean active, LastDone lastDone, Long assigneeId) {
+			boolean active, LastDone lastDone, Long assigneeId, TaskColor color) {
 
 		/** {@code lastDone} is null if the task has never been done. */
 		static TaskResponse from(Task task, LastDone lastDone) {
@@ -52,7 +54,7 @@ public final class TaskDtos {
 			return new TaskResponse(task.getId(), task.getName(), task.getRecurrenceRule(),
 					RecurrenceRules.describe(task.getRecurrenceRule()), choice.frequency(), choice.interval(),
 					choice.daysOfWeek(), choice.dayOfMonth(), task.getStartsOn(), task.getEstimatedMinutes(),
-					task.isActive(), lastDone, task.getAssignedTo());
+					task.isActive(), lastDone, task.getAssignedTo(), task.getColor());
 		}
 
 	}

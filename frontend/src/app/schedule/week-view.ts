@@ -17,6 +17,7 @@ import { addDays, dayLabel, startOfWeek, toIsoDate, weekLabel } from './dates';
 import { OccurrenceStatus, Schedule, ScheduledOccurrence } from './schedule.models';
 import { ScheduleService } from './schedule.service';
 import { changedMessage, isStale, removedMessage, wasAlready } from './stale';
+import { TaskColorDot } from '../task/task-color-dot';
 
 interface Day {
   date: string;
@@ -40,7 +41,7 @@ const FILTER_KEY = 'housework.weekFilter';
 /** The household's week, Sunday to Saturday (BILLIAMVT-39). */
 @Component({
   selector: 'app-week-view',
-  imports: [CdkDrag, CdkDropList, CdkDropListGroup, ConfirmSheet],
+  imports: [CdkDrag, CdkDropList, CdkDropListGroup, ConfirmSheet, TaskColorDot],
   host: {
     // A ⋯ menu closes on a tap anywhere else, or Escape (BILLIAMVT-49)
     '(document:click)': 'closeMenuOutside($event)',

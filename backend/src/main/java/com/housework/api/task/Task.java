@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -41,6 +43,10 @@ public class Task {
 
 	/** Who is meant to do it (BILLIAMVT-64); null means Anyone. Days can override it (Occurrence). */
 	private Long assignedTo;
+
+	/** The household's color for this task, or null for none (BILLIAMVT-65) */
+	@Enumerated(EnumType.STRING)
+	private TaskColor color;
 
 	/** Occurrences exist up to this date (BILLIAMVT-38, V4); null before the first generation. */
 	private LocalDate generatedThrough;
@@ -106,6 +112,14 @@ public class Task {
 	/** The caller has checked that the member is in the task's household. */
 	void assignTo(Long userId) {
 		this.assignedTo = userId;
+	}
+
+	public TaskColor getColor() {
+		return color;
+	}
+
+	void setColor(TaskColor color) {
+		this.color = color;
 	}
 
 	public LocalDate getGeneratedThrough() {

@@ -101,3 +101,29 @@ test('a task can repeat every few months or every year (BILLIAMVT-60)', async ({
   await expect(page.getByLabel('Repeats')).toHaveValue('EVERY_N_MONTHS');
   await expect(page.getByLabel('Every how many months?')).toHaveValue('6');
 });
+
+test('a task gets a color, shown as a dot on the week and Your tasks, and can lose it (BILLIAMVT-65)', async ({ page }) => {
+  await signUpWithHousehold(page, 'Pat');
+  await page.getByRole('link', { name: 'Add a task' }).click();
+  const taskName = page.getByLabel('Task', { exact: true });
+  await formReady(taskName);
+  await taskName.fill('Dishes');
+  await page.getByLabel('Repeats').selectOption({ label: 'Every day' });
+  await expect(page.getByRole('radio', { name: 'None' })).toBeChecked();
+  await page.getByRole('radio', { name: 'Teal' }).check();
+  await expect(page.locator('.color-name')).toHaveText('Teal');
+  await page.getByRole('button', { name: 'Save task' }).click();
+
+  const dot = today(page).locator('.occurrence').filter({ hasText: 'Dishes' }).locator('.task-color-dot');
+  await expect(dot).toHaveAttribute('data-color', 'TEAL');
+  await page.getByRole('link', { name: 'Your tasks' }).click();
+  const row = page.locator('.task').filter({ hasText: 'Dishes' });
+  await expect(row.locator('.task-color-dot')).toHaveAttribute('data-color', 'TEAL');
+
+  // Back to no color
+  await row.getByRole('link', { name: 'Edit' }).click();
+  await expect(page.getByRole('radio', { name: 'Teal' })).toBeChecked();
+  await page.getByRole('radio', { name: 'None' }).check();
+  await page.getByRole('button', { name: 'Save task' }).click();
+  await expect(page.locator('.task').filter({ hasText: 'Dishes' }).locator('.task-color-dot')).toHaveCount(0);
+});

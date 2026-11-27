@@ -14,6 +14,7 @@ import { isStale } from '../schedule/stale';
 import { ConfirmSheet } from '../shared/confirm-sheet';
 import { BacklogItem } from './backlog.models';
 import { BacklogService } from './backlog.service';
+import { TaskColorDot } from '../task/task-color-dot';
 
 /** Choosing a day for one item: the day it was done, or the day to do it. */
 interface Picking {
@@ -35,7 +36,7 @@ interface Picking {
     // Back in the app: items may have changed on another phone (BILLIAMVT-55)
     '(document:visibilitychange)': 'refreshIfVisible()',
   },
-  imports: [ConfirmSheet, ReactiveFormsModule],
+  imports: [ConfirmSheet, ReactiveFormsModule, TaskColorDot],
   templateUrl: './backlog.html',
   styleUrl: './backlog.scss',
 })

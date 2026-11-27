@@ -1,3 +1,5 @@
+import { TaskColor } from '../task/task-colors';
+
 /** A one-off item waiting in the backlog, not yet on a day (BILLIAMVT-23). */
 export interface BacklogItem {
   id: number;
@@ -5,6 +7,8 @@ export interface BacklogItem {
   estimatedMinutes: number | null;
   /** Who it's for, null for Anyone; its day follows it once scheduled (BILLIAMVT-64) */
   assigneeId: number | null;
+  /** The item's color, or null (BILLIAMVT-65) */
+  color: TaskColor | null;
 }
 
 export interface CreateItemRequest {
@@ -14,4 +18,6 @@ export interface CreateItemRequest {
   date?: string;
   /** A household member (BILLIAMVT-64); left out for Anyone */
   assigneeId?: number;
+  /** Left out for none (BILLIAMVT-65) */
+  color?: TaskColor;
 }

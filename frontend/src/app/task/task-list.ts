@@ -11,11 +11,12 @@ import { HouseholdService } from '../household/household.service';
 import { shortDayLabel } from '../schedule/dates';
 import { Task } from './task.models';
 import { TaskService } from './task.service';
+import { TaskColorDot } from './task-color-dot';
 
 /** The household's tasks, with edit, pause/resume and delete (BILLIAMVT-22). */
 @Component({
   selector: 'app-task-list',
-  imports: [ConfirmSheet, RouterLink],
+  imports: [ConfirmSheet, RouterLink, TaskColorDot],
   templateUrl: './task-list.html',
   styleUrl: './task-list.scss',
 })

@@ -68,6 +68,7 @@ public class BacklogService {
 		households.checkMember(household.getId(), request.assigneeId());
 		Task item = new Task(household.getId(), request.name().strip(), null, null, request.estimatedMinutes());
 		item.assignTo(request.assigneeId());
+		item.setColor(request.color());
 		item = tasks.save(item);
 		if (request.date() != null) {
 			occurrences.place(item.getId(), request.date(), OccurrenceStatus.PENDING.name(), null, null);

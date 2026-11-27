@@ -55,3 +55,71 @@ button[type='submit'] {
   margin: var(--space-1) 0 0;
   font-size: var(--text-sm);
 }
+
+// The color picker (BILLIAMVT-65): round 44px swatches that wrap, like the day toggles
+.colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: none;
+
+  legend {
+    margin-bottom: var(--space-1);
+    padding: 0;
+    font-weight: 600;
+  }
+}
+
+.swatch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch);
+  height: var(--touch);
+  margin: 0;
+  cursor: pointer;
+
+  // The radio stays in the page for keyboards and screen readers, under the swatch
+  input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.swatch-mark {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--task-color);
+  // A ring in the page's color, so the chosen ring stands apart from the swatch
+  box-shadow: 0 0 0 2px var(--color-background);
+}
+
+// None: an empty circle with a slash
+.none .swatch-mark {
+  border: 2px solid var(--color-border);
+  background: linear-gradient(135deg, transparent 46%, var(--color-border) 46%, var(--color-border) 54%, transparent 54%);
+}
+
+.swatch input:checked + .swatch-mark {
+  box-shadow:
+    0 0 0 2px var(--color-background),
+    0 0 0 4px var(--color-text);
+}
+
+.swatch input:focus-visible + .swatch-mark {
+  outline: 2px solid var(--color-link);
+  outline-offset: 5px;
+}
+
+.color-name {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

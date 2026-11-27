@@ -6,6 +6,8 @@ import java.util.List;
 
 import jakarta.validation.constraints.NotNull;
 
+import com.housework.api.task.TaskColor;
+
 /** Response bodies for /api/schedule. */
 public final class ScheduleDtos {
 
@@ -16,7 +18,7 @@ public final class ScheduleDtos {
 	public record ScheduledOccurrence(Long id, Long taskId, String taskName, LocalDate date, LocalDate originalDate,
 			OccurrenceStatus status, Integer estimatedMinutes, boolean taskDeleted, Long completedById,
 			String completedByName, Instant completedAt, boolean oneOff, Long assigneeId, String assigneeName,
-			boolean assignmentSet) {
+			boolean assignmentSet, TaskColor color) {
 	}
 
 	/**
@@ -28,11 +30,12 @@ public final class ScheduleDtos {
 	 * (BILLIAMVT-55). {@code assigneeId}/{@code assigneeName}: who it's assigned to, the day's own
 	 * assignee or else the task's; null for Anyone (BILLIAMVT-64). {@code assignmentSet}: the day has
 	 * its own assignee (Anyone included) rather than following its task's, so Undo can put it back.
+	 * {@code color}: the task's color, or null (BILLIAMVT-65).
 	 */
 	public record OccurrenceResponse(Long id, Long taskId, String taskName, LocalDate date, LocalDate originalDate,
 			OccurrenceStatus status, Integer estimatedMinutes, boolean overdue, boolean taskDeleted,
 			Long completedById, String completedByName, Instant completedAt, boolean oneOff, Long assigneeId,
-			String assigneeName, boolean assignmentSet) {
+			String assigneeName, boolean assignmentSet, TaskColor color) {
 
 		static OccurrenceResponse from(ScheduledOccurrence row, LocalDate today) {
 			boolean overdue = !row.taskDeleted() && row.status() == OccurrenceStatus.PENDING
@@ -40,7 +43,7 @@ public final class ScheduleDtos {
 			return new OccurrenceResponse(row.id(), row.taskId(), row.taskName(), row.date(), row.originalDate(),
 					row.status(), row.estimatedMinutes(), overdue, row.taskDeleted(), row.completedById(),
 					row.completedByName(), row.completedAt(), row.oneOff(), row.assigneeId(), row.assigneeName(),
-					row.assignmentSet());
+					row.assignmentSet(), row.color());
 		}
 
 	}

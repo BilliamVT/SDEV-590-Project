@@ -1,3 +1,5 @@
+import { TaskColor } from '../task/task-colors';
+
 /** Shapes of the backend's /api/schedule response (backend ScheduleDtos). Dates are yyyy-mm-dd. */
 export type OccurrenceStatus = 'PENDING' | 'DONE' | 'SKIPPED';
 
@@ -25,6 +27,8 @@ export interface ScheduledOccurrence {
   assigneeName: string | null;
   /** The day has its own assignee (Anyone included) instead of following its task's (BILLIAMVT-64) */
   assignmentSet: boolean;
+  /** The task's color, or null (BILLIAMVT-65) */
+  color: TaskColor | null;
 }
 
 export interface Schedule {
