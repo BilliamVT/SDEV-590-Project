@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/ci.yml?query=branch%3Amain)
 [![Deploy](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/deploy.yml?query=branch%3Amain)
-[![Smoke test](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/smoke.yml/badge.svg?branch=main)](https://github.com/BilliamVT/SDEV-590-Project/actions/workflows/smoke.yml?query=branch%3Amain)
 
 An app for scheduling recurring housework that a household shares: you enter recurring chores and the app generates a schedule for everyone. This is an MVP built as the SDEV 590 capstone at Champlain College.
 
@@ -164,7 +163,7 @@ In CI, the **End-to-end tests** job runs on every PR that changes `backend/`, `f
 
 ### Smoke test (production)
 
-After every successful deploy, the **Smoke test** workflow (`.github/workflows/smoke.yml`) checks production in Chromium and WebKit: it waits for the backend to wake up, logs in with a dedicated account, checks the week loads and Settings shows its household, and logs out; it also checks the manifest and icons load from the deployed paths (BILLIAMVT-53) (`e2e/smoke/`, config `e2e/smoke.config.ts`). It's **read-only**: it never registers, creates or changes anything. Run it by hand from **Actions → Smoke test → Run workflow**.
+After every successful deploy, the **Smoke test** workflow (`.github/workflows/smoke.yml`) checks production in Chromium and WebKit: it waits for the backend to wake up, logs in with a dedicated account, checks the week loads and Settings shows its household, and logs out; it also checks the manifest and icons load from the deployed paths (BILLIAMVT-53) (`e2e/smoke/`, config `e2e/smoke.config.ts`). It's **read-only**: it never registers, creates or changes anything. Run it by hand from **Actions → Smoke test → Run workflow**. Its latest result and when it ran show in the repository's **Deployments** box as **smoke-test**, next to `github-pages` and `production` (BILLIAMVT-73); it deploys nothing, and the delivery metrics only read the Deploy workflow.
 
 - **The smoke account:** "Smoke Test", in a household named "Smoke test" with **no tasks** (so viewing its week generates nothing). Its email and password are the `SMOKE_TEST_EMAIL` and `SMOKE_TEST_PASSWORD` repository secrets; never commit them. Leave this household out of usage numbers (BILLIAMVT-31).
 - **When it fails:** download the run's **smoke-report** artifact and open it with `npx playwright show-report <folder>`; each failure has a screenshot and a trace. A timeout while waiting for the backend is usually a slow cold start: re-run it. Otherwise check the app yourself, then Render's logs and the last deploy. A real break is fixed in a PR labelled `hotfix`.
