@@ -49,6 +49,16 @@
   --text-xl: 1.375rem;
   --text-2xl: 1.75rem;
 
+  // Task colors the household picks (BILLIAMVT-65): each at least 4:1 against the page and the today
+  // card, above the 3:1 WCAG asks of non-text
+  --task-red: #dc2626;
+  --task-orange: #c2410c;
+  --task-yellow: #a16207;
+  --task-green: #15803d;
+  --task-teal: #0f766e;
+  --task-blue: #2563eb;
+  --task-purple: #9333ea;
+  --task-pink: #db2777;
   --radius: 8px;
   // Apple's minimum touch target; the household mostly uses iPhones
   --touch: 44px;
@@ -68,6 +78,15 @@
     --color-done: #0d9488;
     --color-error: #fca592;
     --color-error-surface: #4a1d14;
+    // Lighter task colors for the dark background, each at least 5:1
+    --task-red: #f87171;
+    --task-orange: #fb923c;
+    --task-yellow: #facc15;
+    --task-green: #4ade80;
+    --task-teal: #2dd4bf;
+    --task-blue: #60a5fa;
+    --task-purple: #c084fc;
+    --task-pink: #f472b6;
     --color-success: #22c55e;
     --color-danger: #d92d20;
     --color-on-danger: #ffffff;
@@ -340,3 +359,13 @@ label {
   min-height: var(--touch);
   font-weight: normal;
 }
+
+// Which shade a [data-color] element uses (BILLIAMVT-65): the task color dot and the picker's swatches
+[data-color='RED'] { --task-color: var(--task-red); }
+[data-color='ORANGE'] { --task-color: var(--task-orange); }
+[data-color='YELLOW'] { --task-color: var(--task-yellow); }
+[data-color='GREEN'] { --task-color: var(--task-green); }
+[data-color='TEAL'] { --task-color: var(--task-teal); }
+[data-color='BLUE'] { --task-color: var(--task-blue); }
+[data-color='PURPLE'] { --task-color: var(--task-purple); }
+[data-color='PINK'] { --task-color: var(--task-pink); }

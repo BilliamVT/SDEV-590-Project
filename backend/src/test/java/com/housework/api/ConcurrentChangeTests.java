@@ -117,7 +117,7 @@ class ConcurrentChangeTests {
 	@Test
 	void anItemMarkedDoneWhileSomeoneSchedulesItEndsUpOnOneDay() {
 		Member pat = member();
-		long itemId = backlogService.create(pat.id, new CreateItemRequest("Hang shelves", null, null, null)).id();
+		long itemId = backlogService.create(pat.id, new CreateItemRequest("Hang shelves", null, null, null, null)).id();
 
 		CompletableFuture<?> schedule = overlapping(() -> backlogService.done(pat.id, itemId, today),
 				() -> backlogService.schedule(pat.id, itemId, today.plusDays(3)));
@@ -185,7 +185,7 @@ class ConcurrentChangeTests {
 	}
 
 	private void rename(Member member, long taskId, String name) {
-		taskService.update(member.id, taskId, new CreateTaskRequest(name, Frequency.DAILY, null, null, null, null, null, null));
+		taskService.update(member.id, taskId, new CreateTaskRequest(name, Frequency.DAILY, null, null, null, null, null, null, null));
 	}
 
 	private long pendingFrom(long taskId, LocalDate from) {

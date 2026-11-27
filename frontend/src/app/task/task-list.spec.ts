@@ -25,6 +25,7 @@ const task = (id: number, name: string, extra: Partial<Task> = {}): Task => ({
   active: true,
   lastDone: null,
   assigneeId: null,
+  color: null,
   ...extra,
 });
 
@@ -59,7 +60,9 @@ describe('TaskList', () => {
     const fixture = TestBed.createComponent(TaskList);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
-    const row = (name: string) => [...element.querySelectorAll('.task')].find((r) => r.querySelector('.name')?.textContent === name)!;
+    // By the task's name, after any spoken color ("Teal: Dishes")
+    const row = (name: string) =>
+      [...element.querySelectorAll('.task')].find((r) => r.querySelector('.name')?.textContent?.trim().replace(/^.*: /, '') === name)!;
     const sheetButton = async (label: string) => {
       [...element.querySelectorAll<HTMLButtonElement>('dialog.sheet button')].find((b) => b.textContent?.trim() === label)!.click();
       await fixture.whenStable();
@@ -77,6 +80,15 @@ describe('TaskList', () => {
     expect(row('Dishes').querySelector('.assignee')?.textContent).toBe('Assigned to Sam');
     expect(row('Dishes').querySelector('.assignee .visually-hidden')?.textContent).toBe('Assigned to ');
     expect(row('Vacuum').querySelector('.assignee')).toBeNull();
+  });
+
+  it("shows a task's color as a dot before its name, named for screen readers (BILLIAMVT-65)", async () => {
+    const { row } = await render([task(1, 'Dishes', { color: 'TEAL' }), task(2, 'Vacuum')]);
+
+    expect(row('Dishes').querySelector('.task-color-dot')?.getAttribute('data-color')).toBe('TEAL');
+    expect(row('Dishes').querySelector('.task-color-dot')?.getAttribute('aria-hidden')).toBe('true');
+    expect(row('Dishes').querySelector('.name')?.textContent?.trim()).toBe('Teal: Dishes');
+    expect(row('Vacuum').querySelector('.task-color-dot')).toBeNull();
   });
 
   it('lists the tasks with their schedule, minutes and an edit link', async () => {

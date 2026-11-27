@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { type Page, expect, test } from '@playwright/test';
 
-import { addBacklogItem, addTask, backlog, confirmSheet, openMenu, openSettings, register, today } from './helpers';
+import { addBacklogItem, addTask, backlog, confirmSheet, formReady, openMenu, openSettings, register, today, weekLoaded } from './helpers';
 
 /*
  * Automated accessibility check (BILLIAMVT-49): axe-core looks at every page, in light and dark
@@ -20,7 +20,9 @@ async function expectAccessible(page: Page, name: string): Promise<void> {
 
 for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`${colorScheme} mode`, () => {
-    test.use({ colorScheme });
+    // Reduced motion: the toast then appears and goes without a fade, so the check never catches its
+    // text half faded, which fails contrast at random (seen on Nov 27). The app honors the setting.
+    test.use({ colorScheme, reducedMotion: 'reduce' });
 
     test('every page is accessible', async ({ page }) => {
       await page.goto('/login');
@@ -35,17 +37,28 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
       // The home page with something in every state: pending, done, a one-off item, the backlog
       await addTask(page, 'Vacuum', 'Every day');
+      // A colored task too, so its dot is checked (BILLIAMVT-65)
+      await page.getByRole('link', { name: 'Add a task' }).click();
+      await formReady(page.getByLabel('Task', { exact: true }));
+      await page.getByLabel('Task', { exact: true }).fill('Dishes');
+      await page.getByLabel('Repeats').selectOption({ label: 'Every day' });
+      await page.getByRole('radio', { name: 'Teal' }).check();
+      await page.getByRole('button', { name: 'Save task' }).click();
+      await expect(today(page).locator('.task-color-dot')).toBeVisible();
       await addBacklogItem(page, 'Hang shelves');
       await addBacklogItem(page, 'Clean gutters');
       await page.getByRole('button', { name: 'Schedule Clean gutters' }).click();
       await page.getByRole('button', { name: 'Add to day' }).click();
       await today(page).getByRole('button', { name: 'Mark Vacuum done' }).click();
       await expect(today(page).getByText('Done by Pat')).toBeVisible();
+      // A reload still on its way dims the days, which would fail contrast: check the settled page
+      await weekLoaded(page);
       await expectAccessible(page, 'Home');
 
       // Another week, with Back to this week showing (BILLIAMVT-58)
       await page.getByRole('button', { name: 'Next week' }).click();
       await expect(page.getByRole('button', { name: 'Back to this week' })).toBeVisible();
+      await weekLoaded(page);
       await expectAccessible(page, 'Home, next week');
       await page.getByRole('button', { name: 'Back to this week' }).click();
       await expect(today(page).getByText('Done by Pat')).toBeVisible();
@@ -76,7 +89,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByText('Vacuum')).toBeVisible();
       await expectAccessible(page, 'Your tasks');
 
-      await page.getByRole('link', { name: 'Edit' }).click();
+      await page.locator('.task').filter({ hasText: 'Vacuum' }).getByRole('link', { name: 'Edit' }).click();
       await expect(page.getByLabel('Task', { exact: true })).toHaveValue('Vacuum');
       await expectAccessible(page, 'Edit task');
 

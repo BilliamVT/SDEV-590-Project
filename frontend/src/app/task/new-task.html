@@ -77,6 +77,25 @@
     }
   </select>
 
+  <!-- A color the household picks (BILLIAMVT-65): round swatches like the day toggles, each named for screen readers -->
+  <fieldset class="colors">
+    <legend>Color <span class="optional">(optional)</span></legend>
+    <label class="swatch none">
+      <input type="radio" formControlName="color" [value]="null" />
+      <span class="swatch-mark" aria-hidden="true"></span>
+      <span class="visually-hidden">None</span>
+    </label>
+    @for (option of colors; track option.value) {
+      <label class="swatch" [attr.data-color]="option.value">
+        <input type="radio" formControlName="color" [value]="option.value" />
+        <span class="swatch-mark" aria-hidden="true"></span>
+        <span class="visually-hidden">{{ option.label }}</span>
+      </label>
+    }
+  </fieldset>
+  <!-- The chosen color's name in words too, so color is never the only way to tell -->
+  <p class="color-name">{{ colorName() }}</p>
+
   <label for="task-minutes">Estimated minutes <span class="optional">(optional)</span></label>
   <input id="task-minutes" [attr.aria-invalid]="(attempted() && form.controls.estimatedMinutes.invalid) || null" [attr.aria-describedby]="(attempted() && form.controls.estimatedMinutes.invalid) ? 'task-minutes-error' : null" type="number" formControlName="estimatedMinutes" min="1" max="1440" />
   @if (attempted() && form.controls.estimatedMinutes.invalid) {

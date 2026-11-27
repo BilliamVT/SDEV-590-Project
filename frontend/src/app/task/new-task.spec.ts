@@ -27,6 +27,7 @@ const savedTask = (request: CreateTaskRequest): Task => ({
   active: true,
   lastDone: null,
   assigneeId: null,
+  color: null,
 });
 
 describe('NewTask', () => {
@@ -121,6 +122,43 @@ describe('NewTask', () => {
       await submit();
 
       expect(backlog.create).toHaveBeenCalledWith({ name: 'Vacuum', date: '2026-11-08', assigneeId: 1 });
+    });
+  });
+
+  describe('color (BILLIAMVT-65)', () => {
+    const pick = async (element: HTMLElement, fixture: { whenStable: () => Promise<unknown> }, name: string) => {
+      const swatch = [...element.querySelectorAll('.colors .swatch')].find((l) => l.textContent?.trim() === name)!;
+      swatch.querySelector('input')!.click();
+      await fixture.whenStable();
+    };
+
+    it('offers None and 8 named colors, None first and chosen, and says the choice in words', async () => {
+      const { element } = await render();
+      const swatches = [...element.querySelectorAll<HTMLLabelElement>('.colors .swatch')];
+      expect(swatches.map((s) => s.textContent?.trim())).toEqual(['None', 'Red', 'Orange', 'Yellow', 'Green', 'Teal', 'Blue', 'Purple', 'Pink']);
+      expect(swatches[0].querySelector('input')!.checked).toBe(true);
+      expect(element.querySelector('.color-name')?.textContent?.trim()).toBe('No color');
+      expect(element.querySelector('.colors legend')?.textContent).toContain('Color');
+    });
+
+    it('sends the color picked, and leaves it out for None', async () => {
+      const { tasks, element, fixture, set, submit } = await render();
+      await set('task-name', 'Vacuum');
+      await set('task-frequency', 'DAILY');
+      await pick(element, fixture, 'Teal');
+      expect(element.querySelector('.color-name')?.textContent?.trim()).toBe('Teal');
+      await submit();
+      expect(tasks.create).toHaveBeenLastCalledWith({ name: 'Vacuum', frequency: 'DAILY', color: 'TEAL' });
+    });
+
+    it('colors a one-time task too', async () => {
+      const { backlog, element, fixture, set, submit } = await render();
+      await set('task-name', 'Vacuum');
+      await set('task-frequency', 'ONCE');
+      await set('task-start', '2026-11-08');
+      await pick(element, fixture, 'Pink');
+      await submit();
+      expect(backlog.create).toHaveBeenCalledWith({ name: 'Vacuum', date: '2026-11-08', color: 'PINK' });
     });
   });
 

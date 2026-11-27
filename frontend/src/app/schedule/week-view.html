@@ -104,7 +104,7 @@
                         <span class="circle" aria-hidden="true">{{ occurrence.status === 'DONE' ? '✓' : occurrence.status === 'SKIPPED' ? '–' : '' }}</span>
                       </button>
                       <div class="details">
-                        <span class="name">{{ occurrence.taskName }}</span>
+                        <span class="name"><app-task-color-dot [color]="occurrence.color" />{{ occurrence.taskName }}</span>
                         @if (occurrence.overdue) {
                           <span class="overdue-label">Overdue</span>
                         }

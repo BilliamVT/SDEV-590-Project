@@ -36,6 +36,7 @@ const occurrence = (id: number, taskName: string, date: string, extra: Partial<S
   assigneeId: null,
   assigneeName: null,
   assignmentSet: false,
+  color: null,
   ...extra,
 });
 
@@ -710,6 +711,16 @@ describe('WeekView', () => {
       expect(notice(element)).toBeUndefined();
       expect(element.querySelector('.item-error')).not.toBeNull();
     });
+  });
+
+  it("shows a day's task color as a dot before its name (BILLIAMVT-65)", async () => {
+    const { element } = await render((from, to) =>
+      of(schedule(from, to, [occurrence(1, 'Vacuum', '2026-11-11', { color: 'ORANGE' }), occurrence(2, 'Dishes', '2026-11-11')])),
+    );
+    const rows = element.querySelectorAll('.occurrence');
+    expect(rows[0].querySelector('.task-color-dot')?.getAttribute('data-color')).toBe('ORANGE');
+    expect(rows[0].querySelector('.name')?.textContent?.trim()).toBe('Orange: Vacuum');
+    expect(rows[1].querySelector('.task-color-dot')).toBeNull();
   });
 
   describe('Everyone / Mine (BILLIAMVT-66)', () => {

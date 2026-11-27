@@ -21,7 +21,7 @@
       @for (task of tasks; track task.id) {
         <li class="task" [class.paused]="!task.active">
           <div class="summary">
-            <span class="name">{{ task.name }}</span>
+            <span class="name"><app-task-color-dot [color]="task.color" />{{ task.name }}</span>
             @if (!task.active) {
               <span class="badge">Paused</span>
             }

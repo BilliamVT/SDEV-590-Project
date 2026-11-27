@@ -1,6 +1,8 @@
 import { Component, ElementRef, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { map } from 'rxjs';
 
 import { errorMessage } from '../auth/error-message';
 import { BacklogService } from '../backlog/backlog.service';
@@ -8,6 +10,7 @@ import { HouseholdService } from '../household/household.service';
 import { dayLabel } from '../schedule/dates';
 import { focusFirstInvalid } from '../shared/focus';
 import { Toast } from '../shared/toast';
+import { TASK_COLORS, TaskColor, colorLabel } from './task-colors';
 import { CreateTaskRequest, DayOfWeek, Frequency } from './task.models';
 import { TaskService } from './task.service';
 
@@ -76,7 +79,15 @@ export class NewTask {
     estimatedMinutes: [null as number | null, [Validators.min(1), Validators.max(1440)]],
     // Anyone (null) or a household member (BILLIAMVT-64)
     assigneeId: [null as number | null],
+    // None (null) or one of the palette's colors (BILLIAMVT-65)
+    color: [null as TaskColor | null],
   });
+  protected readonly colors = TASK_COLORS;
+  /** "Teal", or "No color", under the swatches */
+  protected readonly colorName = toSignal(
+    this.form.controls.color.valueChanges.pipe(map((color) => (color ? colorLabel(color) : 'No color'))),
+    { initialValue: 'No color' },
+  );
   /** Who the task can be assigned to: the household's members */
   protected readonly members = this.households.members;
   protected readonly attempted = signal(false);
@@ -110,6 +121,7 @@ export class NewTask {
             startsOn: task.startsOn,
             estimatedMinutes: task.estimatedMinutes,
             assigneeId: task.assigneeId,
+            color: task.color,
           });
           this.originalStart.set(task.startsOn);
           this.loading.set(false);
@@ -280,6 +292,7 @@ export class NewTask {
         date,
         ...(value.estimatedMinutes ? { estimatedMinutes: value.estimatedMinutes } : {}),
         ...(value.assigneeId !== null ? { assigneeId: value.assigneeId } : {}),
+        ...(value.color !== null ? { color: value.color } : {}),
       })
       .subscribe({
         next: (item) => {
@@ -307,6 +320,8 @@ export class NewTask {
     if (value.estimatedMinutes) request.estimatedMinutes = value.estimatedMinutes;
     // Always sent on an edit, where null takes the task back to Anyone; left out for Anyone when adding
     if (this.taskId !== null || value.assigneeId !== null) request.assigneeId = value.assigneeId;
+    // The same for the color: an edit with none clears it
+    if (this.taskId !== null || value.color !== null) request.color = value.color;
     return request;
   }
 }

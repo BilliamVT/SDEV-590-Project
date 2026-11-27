@@ -1,4 +1,6 @@
 /** Shapes of the backend's /api/tasks requests and responses (backend TaskDtos). */
+import { TaskColor } from './task-colors';
+
 /** QUARTERLY is no longer in the menu: every 3 months is EVERY_N_MONTHS with 3 (BILLIAMVT-60). */
 export type Frequency =
   | 'DAILY'
@@ -26,6 +28,8 @@ export interface CreateTaskRequest {
   estimatedMinutes?: number;
   /** A household member, or null for Anyone (BILLIAMVT-64). Editing always sends it. */
   assigneeId?: number | null;
+  /** The task's color, or null for none (BILLIAMVT-65). Editing always sends it. */
+  color?: TaskColor | null;
 }
 
 export interface Task {
@@ -47,6 +51,8 @@ export interface Task {
   lastDone: LastDone | null;
   /** Who the whole task is assigned to; null for Anyone (BILLIAMVT-64) */
   assigneeId: number | null;
+  /** The household's color for it, or null (BILLIAMVT-65) */
+  color: TaskColor | null;
 }
 
 export interface LastDone {

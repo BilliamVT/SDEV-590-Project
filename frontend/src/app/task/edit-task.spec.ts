@@ -32,6 +32,7 @@ describe('NewTask (editing)', () => {
     active: true,
     lastDone: null,
     assigneeId: null,
+    color: null,
   };
 
   async function render(task: Task = existing) {
@@ -79,6 +80,19 @@ describe('NewTask (editing)', () => {
     expect(value('task-minutes')).toBe('5');
   });
 
+  it("shows the task's color, and clears it with None (BILLIAMVT-65)", async () => {
+    const { tasks, element, submit } = await render({ ...existing, color: 'BLUE' });
+    const swatch = (name: string) =>
+      [...element.querySelectorAll('.colors .swatch')].find((l) => l.textContent?.trim() === name)!.querySelector('input')!;
+    expect(swatch('Blue').checked).toBe(true);
+    expect(element.querySelector('.color-name')?.textContent?.trim()).toBe('Blue');
+
+    swatch('None').click();
+    await submit();
+
+    expect(tasks.update).toHaveBeenCalledWith(7, expect.objectContaining({ color: null }));
+  });
+
   it("doesn't offer Never: an existing task keeps a schedule (BILLIAMVT-59)", async () => {
     const { element } = await render();
     const options = [...element.querySelectorAll<HTMLOptionElement>('#task-frequency option')].map((o) => o.value);
@@ -101,6 +115,7 @@ describe('NewTask (editing)', () => {
       startsOn: '2026-11-02',
       estimatedMinutes: 5,
       assigneeId: null,
+      color: null,
     });
     expect(router.navigate).toHaveBeenCalledWith(['/tasks']);
     // A toast, with no "Add another" after an edit (BILLIAMVT-57)

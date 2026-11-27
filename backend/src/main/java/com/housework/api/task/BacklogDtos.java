@@ -24,7 +24,9 @@ public final class BacklogDtos {
 			/** Optional; today (the household's) up to 2 years ahead */
 			LocalDate date,
 			/** A household member, or null for Anyone (BILLIAMVT-64) */
-			Long assigneeId) {
+			Long assigneeId,
+			/** Optional; null for none (BILLIAMVT-65) */
+			TaskColor color) {
 	}
 
 	/** The day to schedule an item on, or the day it was done. */
@@ -35,11 +37,12 @@ public final class BacklogDtos {
 	public record AssignRequest(Long assigneeId) {
 	}
 
-	/** {@code assigneeId}: who the item is for, null for Anyone; its day follows it once scheduled (BILLIAMVT-64). */
-	public record ItemResponse(Long id, String name, Integer estimatedMinutes, Long assigneeId) {
+	/** {@code color}: the item's color, or null (BILLIAMVT-65). {@code assigneeId}: who the item is for, null for Anyone; its day follows it once scheduled (BILLIAMVT-64). */
+	public record ItemResponse(Long id, String name, Integer estimatedMinutes, Long assigneeId, TaskColor color) {
 
 		static ItemResponse from(Task task) {
-			return new ItemResponse(task.getId(), task.getName(), task.getEstimatedMinutes(), task.getAssignedTo());
+			return new ItemResponse(task.getId(), task.getName(), task.getEstimatedMinutes(), task.getAssignedTo(),
+					task.getColor());
 		}
 
 	}

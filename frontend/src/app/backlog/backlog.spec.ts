@@ -10,8 +10,8 @@ import { BacklogItem, CreateItemRequest } from './backlog.models';
 import { BacklogService } from './backlog.service';
 import { Toast } from '../shared/toast';
 
-const shelves: BacklogItem = { id: 1, name: 'Hang shelves', estimatedMinutes: 45, assigneeId: null };
-const gutters: BacklogItem = { id: 2, name: 'Clean gutters', estimatedMinutes: null, assigneeId: null };
+const shelves: BacklogItem = { id: 1, name: 'Hang shelves', estimatedMinutes: 45, assigneeId: null, color: null };
+const gutters: BacklogItem = { id: 2, name: 'Clean gutters', estimatedMinutes: null, assigneeId: null, color: null };
 const MEMBERS = [
   { id: 1, displayName: 'Pat Lee' },
   { id: 2, displayName: 'Sam Ray' },
@@ -46,7 +46,7 @@ describe('Backlog (BILLIAMVT-23)', () => {
     const backlog = {
       list: vi.fn(overrides.list ?? (() => of([shelves, gutters]))),
       create: vi.fn(
-        overrides.create ?? ((r: CreateItemRequest) => of({ id: 3, name: r.name, estimatedMinutes: r.estimatedMinutes ?? null, assigneeId: null })),
+        overrides.create ?? ((r: CreateItemRequest) => of({ id: 3, name: r.name, estimatedMinutes: r.estimatedMinutes ?? null, assigneeId: null, color: null })),
       ),
       schedule: vi.fn(overrides.schedule ?? (() => of(undefined))),
       done: vi.fn(overrides.done ?? (() => of(undefined))),
@@ -154,6 +154,14 @@ describe('Backlog (BILLIAMVT-23)', () => {
       expect(assignSheet(element).hasAttribute('open')).toBe(false);
       expect(element.querySelector('.notice')?.textContent).toContain('Hang shelves is no longer on the backlog.');
     });
+  });
+
+  it("shows an item's color as a dot before its name (BILLIAMVT-65)", async () => {
+    const { element } = await render({ list: () => of([{ ...shelves, color: 'PURPLE' }, gutters]) });
+    const rows = element.querySelectorAll('.item');
+    expect(rows[0].querySelector('.task-color-dot')?.getAttribute('data-color')).toBe('PURPLE');
+    expect(rows[0].querySelector('.name')?.textContent?.trim()).toBe('Purple: Hang shelves');
+    expect(rows[1].querySelector('.task-color-dot')).toBeNull();
   });
 
   it('lists the items in the order added, with minutes', async () => {
