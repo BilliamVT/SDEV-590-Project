@@ -17,6 +17,9 @@ const vacuum = (extra: Partial<ScheduledOccurrence> = {}): ScheduledOccurrence =
   completedById: null,
   completedAt: null,
   oneOff: false,
+  assigneeId: null,
+  assigneeName: null,
+  assignmentSet: false,
   ...extra,
 });
 

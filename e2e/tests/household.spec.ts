@@ -1,6 +1,6 @@
 import { type Browser, type Page, expect, test } from '@playwright/test';
 
-import { addTask, confirmSheet, createHousehold, expectHousehold, inviteCode, joinHousehold, joinHouseholdNamed, openMenu, openSettings, register, today } from './helpers';
+import { addBacklogItem, addTask, backlog, backlogItem, confirmSheet, createHousehold, expectHousehold, formReady, inviteCode, joinHousehold, joinHouseholdNamed, openMenu, openSettings, register, today } from './helpers';
 
 /** Pat creates a household and Sam joins it from another browser session, as on another phone. */
 async function patAndSam(page: Page, browser: Browser): Promise<Page> {
@@ -29,6 +29,70 @@ test('members share the schedule and see who did what', async ({ page, browser }
   await page.reload();
   await expect(today(page).getByText('Done by Sam')).toBeVisible();
   await expect(today(page).getByRole('button', { name: 'Undo Vacuum' })).toBeVisible();
+  await sam.context().close();
+});
+
+/**
+ * Assigning (BILLIAMVT-64): a whole task when adding it, then a single day from its ⋯ menu. Both
+ * members see who it's for; once done, the day shows who actually did it.
+ */
+test('a task is assigned to a member, and one day to someone else', async ({ page, browser }) => {
+  const sam = await patAndSam(page, browser);
+
+  await page.getByRole('link', { name: 'Housework Scheduler' }).click();
+  await page.getByRole('link', { name: 'Add a task' }).click();
+  const taskName = page.getByLabel('Task', { exact: true });
+  await formReady(taskName);
+  await taskName.fill('Vacuum');
+  await page.getByLabel('Repeats').selectOption({ label: 'Every day' });
+  await page.getByLabel('Assigned to').selectOption({ label: 'Sam' });
+  await page.getByRole('button', { name: 'Save task' }).click();
+  await expect(today(page).locator('.assignee')).toHaveText('Assigned to Sam');
+
+  // Pat takes today's
+  await openMenu(today(page), 'Vacuum');
+  await page.getByRole('button', { name: 'Assign: Vacuum' }).click();
+  await confirmSheet(page).getByRole('radio', { name: 'Pat' }).check();
+  await confirmSheet(page).getByRole('button', { name: 'Assign' }).click();
+  await expect(page.locator('.toast')).toContainText('Vacuum on');
+  await expect(today(page).locator('.assignee')).toHaveText('Assigned to Pat');
+
+  // Undo puts the day back to following the task; then Pat takes it again
+  await page.locator('.toast').getByRole('button', { name: /^Undo: Vacuum on/ }).click();
+  await expect(page.locator('.toast')).toContainText('back to Sam');
+  await expect(today(page).locator('.assignee')).toHaveText('Assigned to Sam');
+  await openMenu(today(page), 'Vacuum');
+  await page.getByRole('button', { name: 'Assign: Vacuum' }).click();
+  await confirmSheet(page).getByRole('radio', { name: 'Pat' }).check();
+  await confirmSheet(page).getByRole('button', { name: 'Assign' }).click();
+  await expect(today(page).locator('.assignee')).toHaveText('Assigned to Pat');
+
+  // Sam sees it's Pat's today, and the task is still Sam's
+  await sam.reload();
+  await expect(today(sam).locator('.assignee')).toHaveText('Assigned to Pat');
+  await sam.getByRole('link', { name: 'Your tasks' }).click();
+  await expect(sam.locator('.task').filter({ hasText: 'Vacuum' }).locator('.assignee')).toHaveText('Assigned to Sam');
+  await sam.locator('.task').filter({ hasText: 'Vacuum' }).getByRole('link', { name: 'Edit' }).click();
+  await expect(sam.getByLabel('Assigned to').locator('option:checked')).toHaveText('Sam');
+
+  // Done: who did it replaces who it was for
+  await page.reload();
+  await today(page).getByRole('button', { name: 'Mark Vacuum done' }).click();
+  await expect(today(page).getByText('Done by Pat')).toBeVisible();
+  await expect(today(page).locator('.assignee')).toHaveCount(0);
+
+  // A backlog item is for Sam before it has a day, and its day follows
+  await addBacklogItem(page, 'Hang shelves');
+  await openMenu(backlog(page), 'Hang shelves');
+  await backlog(page).getByRole('button', { name: 'Assign: Hang shelves' }).click();
+  await confirmSheet(page).getByRole('radio', { name: 'Sam' }).check();
+  await confirmSheet(page).getByRole('button', { name: 'Assign' }).click();
+  await expect(backlogItem(page, 'Hang shelves').locator('.assignee')).toHaveText('Assigned to Sam');
+  await backlog(page).getByRole('button', { name: 'Schedule Hang shelves' }).click();
+  await backlog(page).getByRole('button', { name: 'Add to day' }).click();
+  await expect(today(page).locator('.occurrence').filter({ hasText: 'Hang shelves' }).locator('.assignee')).toHaveText(
+    'Assigned to Sam',
+  );
   await sam.context().close();
 });
 

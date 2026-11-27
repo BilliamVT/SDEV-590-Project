@@ -68,6 +68,15 @@
     }
   }
 
+  <!-- Who's doing it (BILLIAMVT-64); single days can be changed later from the week's ⋯ menu -->
+  <label for="task-assignee">Assigned to</label>
+  <select id="task-assignee" formControlName="assigneeId">
+    <option [ngValue]="null">Anyone</option>
+    @for (member of members() ?? []; track member.id) {
+      <option [ngValue]="member.id">{{ member.displayName }}</option>
+    }
+  </select>
+
   <label for="task-minutes">Estimated minutes <span class="optional">(optional)</span></label>
   <input id="task-minutes" [attr.aria-invalid]="(attempted() && form.controls.estimatedMinutes.invalid) || null" [attr.aria-describedby]="(attempted() && form.controls.estimatedMinutes.invalid) ? 'task-minutes-error' : null" type="number" formControlName="estimatedMinutes" min="1" max="1440" />
   @if (attempted() && form.controls.estimatedMinutes.invalid) {

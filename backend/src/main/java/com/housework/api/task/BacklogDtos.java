@@ -22,17 +22,24 @@ public final class BacklogDtos {
 			/** Optional; up to a full day */
 			@Min(1) @Max(1440) Integer estimatedMinutes,
 			/** Optional; today (the household's) up to 2 years ahead */
-			LocalDate date) {
+			LocalDate date,
+			/** A household member, or null for Anyone (BILLIAMVT-64) */
+			Long assigneeId) {
 	}
 
 	/** The day to schedule an item on, or the day it was done. */
 	public record DayRequest(@NotNull LocalDate date) {
 	}
 
-	public record ItemResponse(Long id, String name, Integer estimatedMinutes) {
+	/** PUT /api/backlog/{id}/assignee: a household member, or null for Anyone (BILLIAMVT-64). */
+	public record AssignRequest(Long assigneeId) {
+	}
+
+	/** {@code assigneeId}: who the item is for, null for Anyone; its day follows it once scheduled (BILLIAMVT-64). */
+	public record ItemResponse(Long id, String name, Integer estimatedMinutes, Long assigneeId) {
 
 		static ItemResponse from(Task task) {
-			return new ItemResponse(task.getId(), task.getName(), task.getEstimatedMinutes());
+			return new ItemResponse(task.getId(), task.getName(), task.getEstimatedMinutes(), task.getAssignedTo());
 		}
 
 	}

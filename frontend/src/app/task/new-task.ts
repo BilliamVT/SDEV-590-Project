@@ -74,15 +74,19 @@ export class NewTask {
     dayOfMonth: [1],
     startsOn: [this.households.today()],
     estimatedMinutes: [null as number | null, [Validators.min(1), Validators.max(1440)]],
+    // Anyone (null) or a household member (BILLIAMVT-64)
+    assigneeId: [null as number | null],
   });
+  /** Who the task can be assigned to: the household's members */
+  protected readonly members = this.households.members;
   protected readonly attempted = signal(false);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly loading = signal(this.taskId !== null);
 
   constructor() {
-    // Reached straight from a link or a reload, the household's time zone may not be known yet
-    if (!this.households.timeZoneKnown()) {
+    // Reached straight from a link or a reload, the household's time zone and members may not be known yet
+    if (!this.households.timeZoneKnown() || this.households.members() === null) {
       this.households.load().subscribe({
         next: () => {
           const start = this.form.controls.startsOn;
@@ -105,6 +109,7 @@ export class NewTask {
             dayOfMonth: task.dayOfMonth ?? 1,
             startsOn: task.startsOn,
             estimatedMinutes: task.estimatedMinutes,
+            assigneeId: task.assigneeId,
           });
           this.originalStart.set(task.startsOn);
           this.loading.set(false);
@@ -270,7 +275,12 @@ export class NewTask {
     const value = this.form.getRawValue();
     const date = value.startsOn!;
     this.backlog
-      .create({ name: value.name!.trim(), date, ...(value.estimatedMinutes ? { estimatedMinutes: value.estimatedMinutes } : {}) })
+      .create({
+        name: value.name!.trim(),
+        date,
+        ...(value.estimatedMinutes ? { estimatedMinutes: value.estimatedMinutes } : {}),
+        ...(value.assigneeId !== null ? { assigneeId: value.assigneeId } : {}),
+      })
       .subscribe({
         next: (item) => {
           this.toast.show(`Saved: ${item.name}, ${dayLabel(date)}.`, {
@@ -295,6 +305,8 @@ export class NewTask {
     if (this.frequency() === 'MONTHLY') request.dayOfMonth = Number(value.dayOfMonth);
     if (this.needsStartDate()) request.startsOn = value.startsOn!;
     if (value.estimatedMinutes) request.estimatedMinutes = value.estimatedMinutes;
+    // Always sent on an edit, where null takes the task back to Anyone; left out for Anyone when adding
+    if (this.taskId !== null || value.assigneeId !== null) request.assigneeId = value.assigneeId;
     return request;
   }
 }

@@ -27,10 +27,12 @@ import com.housework.api.auth.EmailAlreadyRegisteredException;
 import com.housework.api.auth.IncorrectPasswordException;
 import com.housework.api.household.AlreadyInHouseholdException;
 import com.housework.api.household.InvalidTimeZoneException;
+import com.housework.api.household.InvalidAssigneeException;
 import com.housework.api.household.InviteCodeNotFoundException;
 import com.housework.api.household.NoHouseholdException;
 import com.housework.api.schedule.InvalidMoveException;
 import com.housework.api.schedule.InvalidRangeException;
+import com.housework.api.schedule.OccurrenceNotAssignableException;
 import com.housework.api.schedule.OccurrenceNotMovableException;
 import com.housework.api.schedule.OccurrenceNotFoundException;
 import com.housework.api.task.InvalidScheduleException;
@@ -103,6 +105,16 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidMoveException.class)
 	ProblemDetail invalidMove(InvalidMoveException ex, HttpServletRequest request) {
 		return problem(request, HttpStatus.BAD_REQUEST, ex, "invalid move date");
+	}
+
+	@ExceptionHandler(OccurrenceNotAssignableException.class)
+	ProblemDetail occurrenceNotAssignable(OccurrenceNotAssignableException ex, HttpServletRequest request) {
+		return problem(request, HttpStatus.CONFLICT, ex, "occurrence can't be assigned");
+	}
+
+	@ExceptionHandler(InvalidAssigneeException.class)
+	ProblemDetail invalidAssignee(InvalidAssigneeException ex, HttpServletRequest request) {
+		return problem(request, HttpStatus.BAD_REQUEST, ex, "assignee not in household");
 	}
 
 	@ExceptionHandler(OccurrenceNotMovableException.class)

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.housework.api.task.BacklogDtos.AssignRequest;
 import com.housework.api.task.BacklogDtos.CreateItemRequest;
 import com.housework.api.task.BacklogDtos.DayRequest;
 import com.housework.api.task.BacklogDtos.ItemResponse;
@@ -52,6 +53,12 @@ class BacklogController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void done(@AuthenticationPrincipal Jwt jwt, @PathVariable long id, @Valid @RequestBody DayRequest request) {
 		backlog.done(userId(jwt), id, request.date());
+	}
+
+	/** Who an open item is for, or Anyone; returns it (BILLIAMVT-64). */
+	@PutMapping("/{id}/assignee")
+	ItemResponse assign(@AuthenticationPrincipal Jwt jwt, @PathVariable long id, @RequestBody AssignRequest request) {
+		return backlog.assign(userId(jwt), id, request.assigneeId());
 	}
 
 	@DeleteMapping("/{id}")

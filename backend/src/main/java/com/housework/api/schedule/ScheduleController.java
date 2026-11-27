@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.housework.api.schedule.ScheduleDtos.AssignRequest;
 import com.housework.api.schedule.ScheduleDtos.MoveRequest;
 import com.housework.api.schedule.ScheduleDtos.OccurrenceResponse;
 import com.housework.api.schedule.ScheduleDtos.ScheduleResponse;
@@ -55,6 +56,19 @@ class ScheduleController {
 	OccurrenceResponse move(@AuthenticationPrincipal Jwt jwt, @PathVariable long id,
 			@Valid @RequestBody MoveRequest request) {
 		return schedule.move(Long.parseLong(jwt.getSubject()), id, request.date());
+	}
+
+	/** Gives one day its own assignee, or Anyone; returns it (BILLIAMVT-64). */
+	@PutMapping("/api/occurrences/{id}/assignee")
+	OccurrenceResponse assign(@AuthenticationPrincipal Jwt jwt, @PathVariable long id,
+			@RequestBody AssignRequest request) {
+		return schedule.assign(Long.parseLong(jwt.getSubject()), id, request.assigneeId());
+	}
+
+	/** Clears one day's own assignee, so it follows its task again; returns it (BILLIAMVT-64, Undo). */
+	@DeleteMapping("/api/occurrences/{id}/assignee")
+	OccurrenceResponse followTask(@AuthenticationPrincipal Jwt jwt, @PathVariable long id) {
+		return schedule.followTask(Long.parseLong(jwt.getSubject()), id);
 	}
 
 	/** Deletes one occurrence for good (BILLIAMVT-25); the front end confirms first. */

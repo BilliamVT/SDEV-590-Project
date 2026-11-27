@@ -80,3 +80,11 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+
+// Who it's for, in teal like the week view (BILLIAMVT-64)
+.assignee {
+  margin-left: var(--space-2);
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}

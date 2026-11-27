@@ -20,6 +20,11 @@ export interface ScheduledOccurrence {
   completedAt: string | null;
   /** A backlog item's day: deleting it can put the item back in the backlog (BILLIAMVT-23). */
   oneOff: boolean;
+  /** Who it's assigned to: the day's own assignee, or else the task's; null for Anyone (BILLIAMVT-64) */
+  assigneeId: number | null;
+  assigneeName: string | null;
+  /** The day has its own assignee (Anyone included) instead of following its task's (BILLIAMVT-64) */
+  assignmentSet: boolean;
 }
 
 export interface Schedule {

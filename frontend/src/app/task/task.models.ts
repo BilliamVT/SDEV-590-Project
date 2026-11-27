@@ -24,6 +24,8 @@ export interface CreateTaskRequest {
   /** yyyy-mm-dd */
   startsOn?: string;
   estimatedMinutes?: number;
+  /** A household member, or null for Anyone (BILLIAMVT-64). Editing always sends it. */
+  assigneeId?: number | null;
 }
 
 export interface Task {
@@ -43,6 +45,8 @@ export interface Task {
   active: boolean;
   /** The latest day it was done, and by whom (BILLIAMVT-26); null if never done */
   lastDone: LastDone | null;
+  /** Who the whole task is assigned to; null for Anyone (BILLIAMVT-64) */
+  assigneeId: number | null;
 }
 
 export interface LastDone {

@@ -30,6 +30,11 @@ export class BacklogService {
     return this.http.post<void>(`${this.url}/${id}/done`, { date });
   }
 
+  /** Who the item is for, or Anyone with null; returns it (BILLIAMVT-64). */
+  assign(id: number, assigneeId: number | null): Observable<BacklogItem> {
+    return this.http.put<BacklogItem>(`${this.url}/${id}/assignee`, { assigneeId });
+  }
+
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.url}/${id}`);
   }

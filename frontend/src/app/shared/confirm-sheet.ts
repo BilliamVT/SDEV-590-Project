@@ -11,7 +11,7 @@ let nextId = 0;
  *
  * It can also hold a small form, e.g. a day to move to (BILLIAMVT-56): content placed inside goes
  * between the sentence and the buttons, and an autofocus field there gets the focus instead of
- * Cancel. {@code confirmClass} "primary" makes the confirm button the app's colour, not red.
+ * Cancel. {@code confirmClass} "primary" makes the confirm button the app's color, not red.
  */
 @Component({
   selector: 'app-confirm-sheet',

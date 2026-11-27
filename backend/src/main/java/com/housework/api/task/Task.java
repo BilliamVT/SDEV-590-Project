@@ -39,6 +39,9 @@ public class Task {
 	/** Set when deleted (BILLIAMVT-22); deleted tasks are kept so their history stays. */
 	private Instant deletedAt;
 
+	/** Who is meant to do it (BILLIAMVT-64); null means Anyone. Days can override it (Occurrence). */
+	private Long assignedTo;
+
 	/** Occurrences exist up to this date (BILLIAMVT-38, V4); null before the first generation. */
 	private LocalDate generatedThrough;
 
@@ -94,6 +97,15 @@ public class Task {
 	/** Paused or deleted tasks get no new occurrences. */
 	public boolean isScheduled() {
 		return active && deletedAt == null;
+	}
+
+	public Long getAssignedTo() {
+		return assignedTo;
+	}
+
+	/** The caller has checked that the member is in the task's household. */
+	void assignTo(Long userId) {
+		this.assignedTo = userId;
 	}
 
 	public LocalDate getGeneratedThrough() {

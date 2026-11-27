@@ -92,6 +92,9 @@
                             Done by {{ occurrence.completedByName ?? 'a former member' }}
                           } @else if (occurrence.status === 'SKIPPED') {
                             Skipped by {{ occurrence.completedByName ?? 'a former member' }}
+                          } @else if (occurrence.assigneeName) {
+                            <!-- Who's doing it (BILLIAMVT-64); Anyone shows nothing -->
+                            <span class="assignee"><span class="visually-hidden">Assigned to </span>{{ firstName(occurrence.assigneeName) }}</span>
                           }
                           @if (minutes(occurrence); as text) {
                             <span class="minutes">{{ text }}</span>
@@ -124,6 +127,14 @@
                             >
                               Move
                             </button>
+                            <button
+                              type="button"
+                              [attr.aria-label]="'Assign: ' + occurrence.taskName"
+                              [disabled]="saving().has(occurrence.id)"
+                              (click)="startAssign(occurrence)"
+                            >
+                              Assign
+                            </button>
                           }
                           <button
                             type="button"
@@ -151,6 +162,14 @@
                               (click)="startMove(occurrence)"
                             >
                               Move
+                            </button>
+                            <button
+                              type="button"
+                              [attr.aria-label]="'Assign: ' + occurrence.taskName"
+                              [disabled]="saving().has(occurrence.id)"
+                              (click)="startAssign(occurrence)"
+                            >
+                              Assign
                             </button>
                             <button
                               type="button"
@@ -220,6 +239,35 @@
             (input)="moveDate.set($any($event.target).value)"
           />
         </div>
+      }
+    </app-confirm-sheet>
+
+    <!-- Assigns one day (BILLIAMVT-64): the same action sheet, holding the household's members -->
+    <app-confirm-sheet
+      [open]="pendingAssign() !== null"
+      [message]="assignMessage()"
+      confirmLabel="Assign"
+      busyLabel="Assigning…"
+      confirmClass="primary"
+      [busy]="pendingAssign() !== null && saving().has(pendingAssign()!.id)"
+      [error]="pendingAssign() ? (itemErrors().get(pendingAssign()!.id) ?? null) : null"
+      (confirmed)="confirmAssign()"
+      (cancelled)="cancelAssign()"
+    >
+      @if (pendingAssign()) {
+        <fieldset class="assign-choices">
+          <legend class="visually-hidden">Assigned to</legend>
+          <label class="choice">
+            <input type="radio" name="assignee" [checked]="assignChoice() === null" (change)="assignChoice.set(null)" />
+            Anyone
+          </label>
+          @for (member of members() ?? []; track member.id) {
+            <label class="choice">
+              <input type="radio" name="assignee" [checked]="assignChoice() === member.id" (change)="assignChoice.set(member.id)" />
+              {{ member.displayName }}
+            </label>
+          }
+        </fieldset>
       }
     </app-confirm-sheet>
   </section>

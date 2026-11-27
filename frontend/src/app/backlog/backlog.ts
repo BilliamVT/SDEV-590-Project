@@ -4,9 +4,10 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Observable } from 'rxjs';
 
 import { errorMessage } from '../auth/error-message';
+import { firstName } from '../household/household.models';
 import { HouseholdService } from '../household/household.service';
 import { Announcer } from '../shared/announcer';
-import { Toast } from '../shared/toast';
+import { Toast, ToastAction } from '../shared/toast';
 import { focusFirstInvalid, focusLater } from '../shared/focus';
 import { dayLabel } from '../schedule/dates';
 import { isStale } from '../schedule/stale';
@@ -78,6 +79,16 @@ export class Backlog {
   /** The item the delete action sheet is open for */
   protected readonly confirmingDelete = signal<number | null>(null);
   protected readonly pendingDelete = computed(() => this.items()?.find((i) => i.id === this.confirmingDelete()) ?? null);
+  /** The item the assign sheet is open for, and the member chosen in it (null: Anyone) (BILLIAMVT-64) */
+  protected readonly choosingAssign = signal<number | null>(null);
+  protected readonly assignChoice = signal<number | null>(null);
+  protected readonly pendingAssign = computed(() => this.items()?.find((i) => i.id === this.choosingAssign()) ?? null);
+  protected readonly assignMessage = computed(() => {
+    const item = this.pendingAssign();
+    return item ? `Who's doing ${item.name}?` : '';
+  });
+  /** The household's members; the week view beside this list loads them */
+  protected readonly members = this.households.members;
   protected readonly saving = signal<ReadonlySet<number>>(new Set());
   protected readonly itemErrors = signal<ReadonlyMap<number, string>>(new Map());
 
@@ -192,6 +203,70 @@ export class Backlog {
     });
   }
 
+  /** The assignee's first name (BILLIAMVT-64); null for Anyone, or while members are loading */
+  protected assignee(item: BacklogItem): string | null {
+    const member = this.members()?.find((m) => m.id === item.assigneeId);
+    return member ? firstName(member.displayName) : null;
+  }
+
+  /** Assign in the ⋯ menu (BILLIAMVT-64): who the item is for, in an action sheet like the week view's. */
+  protected startAssign(item: BacklogItem): void {
+    this.menuOpen.set(null);
+    this.picking.set(null);
+    this.notice.set(null);
+    this.itemErrors.update((errors) => removeError(errors, item.id));
+    this.assignChoice.set(item.assigneeId);
+    this.choosingAssign.set(item.id);
+  }
+
+  protected confirmAssign(): void {
+    const item = this.pendingAssign();
+    if (item) {
+      this.assign(item, this.assignChoice(), true);
+    }
+  }
+
+  protected cancelAssign(): void {
+    const id = this.choosingAssign();
+    this.choosingAssign.set(null);
+    if (id !== null) {
+      this.itemErrors.update((errors) => removeError(errors, id));
+      this.focusMore(id);
+    }
+  }
+
+  /** Sends the assignee; the item stays on the list with it. The toast offers Undo unless this is the undo. */
+  private assign(item: BacklogItem, assigneeId: number | null, offerUndo: boolean): void {
+    const id = item.id;
+    this.saving.update((ids) => new Set(ids).add(id));
+    this.itemErrors.update((errors) => removeError(errors, id));
+    this.backlog.assign(id, assigneeId).subscribe({
+      next: (assigned) => {
+        this.items.update((items) => items && items.map((i) => (i.id === id ? assigned : i)));
+        this.saving.update((ids) => removeId(ids, id));
+        this.choosingAssign.set(null);
+        const who = this.assignee(assigned) ?? 'Anyone';
+        this.toast.show(
+          offerUndo ? `${assigned.name}: ${who}.` : `${assigned.name}: back to ${who}.`,
+          offerUndo ? this.undoAssign(item) : undefined,
+        );
+        this.focusMore(id);
+      },
+      error: (err: unknown) => {
+        this.saving.update((ids) => removeId(ids, id));
+        if (isStale(err)) {
+          this.refreshAfterStale(item);
+        } else {
+          this.itemErrors.update((errors) => new Map(errors).set(id, errorMessage(err)));
+        }
+      },
+    });
+  }
+
+  private undoAssign(before: BacklogItem): ToastAction {
+    return { label: 'Undo', run: () => this.assign(before, before.assigneeId, false) };
+  }
+
   /** Asks first in an action sheet (BILLIAMVT-49; it used the browser's confirm before). */
   protected delete(item: BacklogItem): void {
     this.menuOpen.set(null);
@@ -212,6 +287,7 @@ export class Backlog {
   protected toggleMenu(item: BacklogItem): void {
     this.picking.set(null);
     this.confirmingDelete.set(null);
+    this.choosingAssign.set(null);
     this.menuOpen.update((open) => (open === item.id ? null : item.id));
   }
 
@@ -278,6 +354,7 @@ export class Backlog {
   private refreshAfterStale(item: BacklogItem): void {
     this.picking.set(null);
     this.confirmingDelete.set(null);
+    this.choosingAssign.set(null);
     this.placed.emit();
     this.reload(() => {
       this.notice.set(`${item.name} is no longer on the backlog. Your week and backlog are up to date.`);

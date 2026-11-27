@@ -4,7 +4,7 @@ import { Observable, catchError, of, tap, throwError } from 'rxjs';
 
 import { environment } from '../../environments/environment';
 import { todayIn } from '../schedule/dates';
-import { Household } from './household.models';
+import { Household, Member } from './household.models';
 
 /** The logged-in user's household (decision record 0005: no household IDs in requests). */
 @Injectable({ providedIn: 'root' })
@@ -14,6 +14,8 @@ export class HouseholdService {
   /** The household's time zone, from the last household response; null until one arrives. */
   private readonly zone = signal<string | null>(null);
   readonly timeZoneKnown = computed(() => this.zone() !== null);
+  /** The household's members from the last household response, for choosing an assignee (BILLIAMVT-64); null until one arrives. */
+  readonly members = signal<Member[] | null>(null);
 
   /**
    * Today in the household's time zone, which is how the server decides "today" (BILLIAMVT-51).
@@ -30,7 +32,10 @@ export class HouseholdService {
       catchError((error: unknown) =>
         error instanceof HttpErrorResponse && error.status === 404 ? of(null) : throwError(() => error),
       ),
-      tap((household) => this.zone.set(household?.timeZone ?? null)),
+      tap((household) => {
+        this.zone.set(household?.timeZone ?? null);
+        this.members.set(household?.members ?? null);
+      }),
     );
   }
 
@@ -55,7 +60,10 @@ export class HouseholdService {
 
   /** Keeps the time zone of the household in a response; joining one can change it. */
   private remember() {
-    return tap((household: Household) => this.zone.set(household.timeZone));
+    return tap((household: Household) => {
+      this.zone.set(household.timeZone);
+      this.members.set(household.members);
+    });
   }
 }
 
